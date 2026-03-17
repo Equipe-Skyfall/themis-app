@@ -7,12 +7,14 @@ class DashboardScreen extends StatelessWidget {
   final VoidCallback onNewAnalysis;
   final String? userName;
   final VoidCallback? onLogout;
+  final VoidCallback? onOpenSettings;
 
   const DashboardScreen({
     Key? key,
     required this.onNewAnalysis,
     this.userName,
     this.onLogout,
+    this.onOpenSettings,
   }) : super(key: key);
 
   @override
@@ -21,7 +23,7 @@ class DashboardScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: CustomAppBar(),
+      appBar: CustomAppBar(onSettings: onOpenSettings),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

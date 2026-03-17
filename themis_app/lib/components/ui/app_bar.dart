@@ -4,8 +4,16 @@ import 'package:flutter/material.dart';
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final VoidCallback? onBack;
+  final bool showSettings;
+  final VoidCallback? onSettings;
 
-  const CustomAppBar({Key? key, this.title = "Themis", this.onBack})
+  const CustomAppBar({
+    Key? key,
+    this.title = "Themis",
+    this.onBack,
+    this.showSettings = true,
+    this.onSettings,
+  })
     : super(key: key);
 
   @override
@@ -36,6 +44,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ],
       ),
+      actions: showSettings
+          ? [
+              IconButton(
+                onPressed: onSettings,
+                icon: const Icon(Icons.settings_sharp, size: 20),
+                tooltip: 'Configurações',
+              ),
+              const SizedBox(width: 4),
+            ]
+          : null,
       centerTitle: false,
     );
   }
