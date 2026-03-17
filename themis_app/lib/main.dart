@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'components/themis/auth_screen.dart';
 import 'components/themis/dashboard_screen.dart';
+import 'components/themis/settings_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,6 +35,7 @@ class AppController extends StatefulWidget {
 class _AppControllerState extends State<AppController> {
   bool isLoggedIn = false;
   Map<String, String>? currentUser;
+  bool isInSettings = false;
 
   void handleLogin(Map<String, String> user) {
     setState(() {
@@ -46,6 +48,19 @@ class _AppControllerState extends State<AppController> {
     setState(() {
       currentUser = null;
       isLoggedIn = false;
+      isInSettings = false;
+    });
+  }
+
+  void handleOpenSettings() {
+    setState(() {
+      isInSettings = true;
+    });
+  }
+
+  void handleCloseSettings() {
+    setState(() {
+      isInSettings = false;
     });
   }
 
@@ -55,9 +70,14 @@ class _AppControllerState extends State<AppController> {
       return AuthScreen(onLogin: handleLogin);
     }
 
+    if (isInSettings) {
+      return SettingsScreen(onBack: handleCloseSettings);
+    }
+
     return DashboardScreen(
       userName: currentUser?['name'],
       onLogout: handleLogout,
+      onOpenSettings: handleOpenSettings,
       onNewAnalysis: () {
         ScaffoldMessenger.of(
           context,
