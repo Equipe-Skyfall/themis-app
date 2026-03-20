@@ -1,25 +1,26 @@
-// themis_app/lib/screens/dashboard_screen.dart
 import 'package:flutter/material.dart';
-import '../../data/mock_data.dart';
-import '../ui/app_bar.dart';
 
-class DashboardScreen extends StatelessWidget {
+import '../ui/app_bar.dart';
+import '../../data/mock_data.dart';
+
+class DashboardPage extends StatelessWidget {
   final VoidCallback onNewAnalysis;
   final String? userName;
   final VoidCallback? onLogout;
   final VoidCallback? onOpenSettings;
 
-  const DashboardScreen({
-    Key? key,
+  const DashboardPage({
+    super.key,
     required this.onNewAnalysis,
     this.userName,
     this.onLogout,
     this.onOpenSettings,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    int completedCount = mockCases.where((c) => c.status == "completed").length;
+    final completedCount =
+        mockCases.where((item) => item.status == 'completed').length;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -36,15 +37,15 @@ class DashboardScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "Bem-vindo(a),",
+                      'Bem-vindo(a),',
                       style: TextStyle(color: Colors.grey[600], fontSize: 14),
                     ),
                     Text(
-                      userName ?? "Usuário",
-                      style: TextStyle(
+                      userName ?? 'Usuario',
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1E1E2C),
+                        color: Color(0xFF1E1E2C),
                       ),
                     ),
                   ],
@@ -53,7 +54,7 @@ class DashboardScreen extends StatelessWidget {
                   TextButton(
                     onPressed: onLogout,
                     child: Text(
-                      "Sair",
+                      'Sair',
                       style: TextStyle(color: Colors.grey[600]),
                     ),
                   ),
@@ -86,20 +87,23 @@ class DashboardScreen extends StatelessWidget {
                         errorBuilder: (_, __, ___) =>
                             const SizedBox(width: 20, height: 20),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
-                        "Resumo Mensal",
+                        'Resumo Mensal',
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "$completedCount",
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                    '$completedCount',
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(
-                    "processos analisados em março",
+                    'processos analisados em marco',
                     style: TextStyle(color: Colors.grey[600], fontSize: 14),
                   ),
                 ],
@@ -126,12 +130,12 @@ class DashboardScreen extends StatelessWidget {
                       child: const Icon(Icons.add, color: Colors.white),
                     ),
                     const SizedBox(width: 16),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Nova Análise de Petição",
+                            'Nova Analise de Peticao',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -139,7 +143,7 @@ class DashboardScreen extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            "Encontre precedentes com IA",
+                            'Encontre precedentes com IA',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 14,
@@ -154,68 +158,66 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-            Text(
-              "Análises Recentes",
+            const Text(
+              'Analises Recentes',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            ...mockCases
-                .map(
-                  (c) => Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!),
+            ...mockCases.map(
+              (item) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: ListTile(
+                  title: Text(
+                    item.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
-                    child: ListTile(
-                      title: Text(
-                        c.title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Text(
-                        "${c.date} · ${c.matchCount} precedentes",
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(c.status).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              _getStatusLabel(c.status),
-                              style: TextStyle(
-                                color: _getStatusColor(c.status),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.chevron_right,
-                            color: Colors.grey[400],
-                            size: 20,
-                          ),
-                        ],
-                      ),
-                      onTap: () {},
-                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                )
-                .toList(),
+                  subtitle: Text(
+                    '${item.date} · ${item.matchCount} precedentes',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(item.status).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          _getStatusLabel(item.status),
+                          style: TextStyle(
+                            color: _getStatusColor(item.status),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.chevron_right,
+                        color: Colors.grey[400],
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                  onTap: () {},
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -223,14 +225,22 @@ class DashboardScreen extends StatelessWidget {
   }
 
   Color _getStatusColor(String status) {
-    if (status == "completed") return Colors.green;
-    if (status == "pending") return Colors.orange;
+    if (status == 'completed') {
+      return Colors.green;
+    }
+    if (status == 'pending') {
+      return Colors.orange;
+    }
     return Colors.blue;
   }
 
   String _getStatusLabel(String status) {
-    if (status == "completed") return "Concluído";
-    if (status == "pending") return "Pendente";
-    return "Em análise";
+    if (status == 'completed') {
+      return 'Concluido';
+    }
+    if (status == 'pending') {
+      return 'Pendente';
+    }
+    return 'Em analise';
   }
 }

@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
-import 'components/themis/auth_screen.dart';
-import 'components/themis/dashboard_screen.dart';
-import 'components/themis/settings_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 
-void main() {
+import 'hooks/use_auth_controller.dart';
+import 'components/pages/auth_page.dart';
+import 'components/pages/dashboard_page.dart';
+import 'components/pages/settings_page.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
   runApp(const MyApp());
 }
 
@@ -25,59 +31,34 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AppController extends StatefulWidget {
+class AppController extends HookWidget {
   const AppController({super.key});
 
   @override
-  State<AppController> createState() => _AppControllerState();
-}
-
-class _AppControllerState extends State<AppController> {
-  bool isLoggedIn = false;
-  Map<String, String>? currentUser;
-  bool isInSettings = false;
-
-  void handleLogin(Map<String, String> user) {
-    setState(() {
-      currentUser = user;
-      isLoggedIn = true;
-    });
-  }
-
-  void handleLogout() {
-    setState(() {
-      currentUser = null;
-      isLoggedIn = false;
-      isInSettings = false;
-    });
-  }
-
-  void handleOpenSettings() {
-    setState(() {
-      isInSettings = true;
-    });
-  }
-
-  void handleCloseSettings() {
-    setState(() {
-      isInSettings = false;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (!isLoggedIn) {
-      return AuthScreen(onLogin: handleLogin);
+    final auth = useAuthController();
+    final isInSettings = useState(false);
+
+    if (auth.session == null) {
+      return AuthPage(onLogin: auth.login, onRegister: auth.register);
     }
 
-    if (isInSettings) {
-      return SettingsScreen(onBack: handleCloseSettings);
+    if (isInSettings.value) {
+      return SettingsPage(
+        onBack: () {
+          isInSettings.value = false;
+        },
+      );
     }
 
-    return DashboardScreen(
-      userName: currentUser?['name'],
-      onLogout: handleLogout,
-      onOpenSettings: handleOpenSettings,
+    return DashboardPage(
+      userName: auth.session?.user.username,
+      onLogout: () {
+        auth.logout();
+      },
+      onOpenSettings: () {
+        isInSettings.value = true;
+      },
       onNewAnalysis: () {
         ScaffoldMessenger.of(
           context,

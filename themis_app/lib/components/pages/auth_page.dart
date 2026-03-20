@@ -1,36 +1,38 @@
 import 'package:flutter/material.dart';
-import '../ui/primary_button.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
+
 import '../ui/custom_text_field.dart';
+import '../ui/primary_button.dart';
+import '../../hooks/use_auth_form_controller.dart';
 
-class AuthScreen extends StatefulWidget {
-  final Function(Map<String, String> user) onLogin;
+class AuthPage extends HookWidget {
+  final LoginHandler onLogin;
+  final RegisterHandler onRegister;
 
-  const AuthScreen({Key? key, required this.onLogin}) : super(key: key);
-
-  @override
-  State<AuthScreen> createState() => _AuthScreenState();
-}
-
-class _AuthScreenState extends State<AuthScreen> {
-  bool isLogin = true;
-  String name = "";
-  String email = "";
-  String password = "";
-  String role = "advogado";
-
-  void handleSubmit() {
-    final user = {
-      'name': !isLogin ? name : 'Usuario',
-      'email': email,
-      'role': role,
-    };
-    widget.onLogin(user);
-  }
+  const AuthPage({
+    super.key,
+    required this.onLogin,
+    required this.onRegister,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final authForm = useAuthFormController(
+      onLogin: onLogin,
+      onRegister: onRegister,
+    );
+
+    Future<void> onSubmitPressed() async {
+      final result = await authForm.submit();
+      if (result == AuthSubmitResult.successRegister && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Conta criada com sucesso.')),
+        );
+      }
+    }
+
     return Scaffold(
-      backgroundColor: Colors.grey[50], // Ou usar Tb.slate.shade50
+      backgroundColor: Colors.grey[50],
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -40,7 +42,6 @@ class _AuthScreenState extends State<AuthScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo
                   SizedBox(
                     width: 144,
                     height: 144,
@@ -56,21 +57,19 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    "Themis",
+                  const Text(
+                    'Themis',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: const Color(0xFF1E1E2C), // Primary Color
+                      color: Color(0xFF1E1E2C),
                     ),
                   ),
                   const Text(
-                    "Análise inteligente de precedentes",
+                    'Analise inteligente de precedentes',
                     style: TextStyle(color: Colors.grey),
                   ),
                   const SizedBox(height: 32),
-
-                  // Tabs
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -81,26 +80,26 @@ class _AuthScreenState extends State<AuthScreen> {
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => setState(() => isLogin = true),
+                            onTap: authForm.showLogin,
                             child: Container(
                               alignment: Alignment.center,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: isLogin
+                                color: authForm.isLogin
                                     ? Colors.white
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(6),
-                                boxShadow: isLogin
-                                    ? [
-                                        const BoxShadow(
+                                boxShadow: authForm.isLogin
+                                    ? const [
+                                        BoxShadow(
                                           color: Colors.black12,
                                           blurRadius: 2,
                                         ),
                                       ]
-                                    : [],
+                                    : const [],
                               ),
                               child: const Text(
-                                "Entrar",
+                                'Entrar',
                                 style: TextStyle(fontWeight: FontWeight.w500),
                               ),
                             ),
@@ -108,26 +107,26 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => setState(() => isLogin = false),
+                            onTap: authForm.showRegister,
                             child: Container(
                               alignment: Alignment.center,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
-                                color: !isLogin
+                                color: !authForm.isLogin
                                     ? Colors.white
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(6),
-                                boxShadow: !isLogin
-                                    ? [
-                                        const BoxShadow(
+                                boxShadow: !authForm.isLogin
+                                    ? const [
+                                        BoxShadow(
                                           color: Colors.black12,
                                           blurRadius: 2,
                                         ),
                                       ]
-                                    : [],
+                                    : const [],
                               ),
                               child: const Text(
-                                "Cadastrar",
+                                'Cadastrar',
                                 style: TextStyle(fontWeight: FontWeight.w500),
                               ),
                             ),
@@ -137,36 +136,42 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-
-                  // Form Refatorado em Componentes
-                  if (!isLogin) ...[
+                  if (!authForm.isLogin) ...[
                     CustomTextField(
-                      label: "Nome completo",
-                      hintText: "Dr. Joao Silva",
-                      onChanged: (v) => name = v,
+                      label: 'Nome de usuario',
+                      hintText: 'newuser',
+                      controller: authForm.nameController,
                     ),
                     const SizedBox(height: 16),
                   ],
-
                   CustomTextField(
-                    label: "E-mail",
-                    hintText: "joao@escritorio.com",
-                    onChanged: (v) => email = v,
+                    label: 'E-mail',
+                    hintText: 'joao@escritorio.com',
+                    controller: authForm.emailController,
                   ),
                   const SizedBox(height: 16),
-
                   CustomTextField(
-                    label: "Senha",
-                    hintText: "••••••••",
+                    label: 'Senha',
+                    hintText: '********',
                     obscureText: true,
-                    onChanged: (v) => password = v,
+                    controller: authForm.passwordController,
                   ),
+                  if (authForm.errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      authForm.errorMessage!,
+                      style: const TextStyle(
+                        color: Color(0xFFD94841),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
-
-                  // Botao refatorado
                   PrimaryButton(
-                    text: isLogin ? "Entrar" : "Criar conta",
-                    onPressed: handleSubmit,
+                    text: authForm.isSubmitting
+                        ? 'Carregando...'
+                        : (authForm.isLogin ? 'Entrar' : 'Criar conta'),
+                    onPressed: authForm.isSubmitting ? null : onSubmitPressed,
                   ),
                 ],
               ),
