@@ -9,11 +9,7 @@ class AuthPage extends HookWidget {
   final LoginHandler onLogin;
   final RegisterHandler onRegister;
 
-  const AuthPage({
-    super.key,
-    required this.onLogin,
-    required this.onRegister,
-  });
+  const AuthPage({super.key, required this.onLogin, required this.onRegister});
 
   @override
   Widget build(BuildContext context) {
@@ -139,20 +135,20 @@ class AuthPage extends HookWidget {
                   if (!authForm.isLogin) ...[
                     CustomTextField(
                       label: 'Nome de usuario',
-                      hintText: 'newuser',
+                      hintText: 'Insira seu nome de usuario aqui',
                       controller: authForm.nameController,
                     ),
                     const SizedBox(height: 16),
                   ],
                   CustomTextField(
                     label: 'E-mail',
-                    hintText: 'joao@escritorio.com',
+                    hintText: 'Insira seu email aqui',
                     controller: authForm.emailController,
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
                     label: 'Senha',
-                    hintText: '********',
+                    hintText: '••••••••',
                     obscureText: true,
                     controller: authForm.passwordController,
                   ),
