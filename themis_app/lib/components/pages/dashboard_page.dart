@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../ui/app_bar.dart';
 import '../../data/mock_data.dart';
+import '../../lib/models.dart';
 
 class DashboardPage extends StatelessWidget {
   final VoidCallback onNewAnalysis;
   final String? userName;
   final VoidCallback? onLogout;
   final VoidCallback? onOpenSettings;
+  final Function(CaseHistory)? onSelectCase;
 
   const DashboardPage({
     super.key,
@@ -15,12 +17,14 @@ class DashboardPage extends StatelessWidget {
     this.userName,
     this.onLogout,
     this.onOpenSettings,
+    this.onSelectCase,
   });
 
   @override
   Widget build(BuildContext context) {
-    final completedCount =
-        mockCases.where((item) => item.status == 'completed').length;
+    final completedCount = mockCases
+        .where((item) => item.status == 'completed')
+        .length;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -214,7 +218,9 @@ class DashboardPage extends StatelessWidget {
                       ),
                     ],
                   ),
-                  onTap: () {},
+                  onTap: () {
+                    onSelectCase?.call(item);
+                  },
                 ),
               ),
             ),
