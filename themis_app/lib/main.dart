@@ -6,6 +6,9 @@ import 'hooks/use_auth_controller.dart';
 import 'components/pages/auth_page.dart';
 import 'components/pages/dashboard_page.dart';
 import 'components/pages/settings_page.dart';
+import 'components/pages/results_page.dart';
+import 'lib/models.dart';
+import 'data/mock_data.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,15 +41,28 @@ class AppController extends HookWidget {
   Widget build(BuildContext context) {
     final auth = useAuthController();
     final isInSettings = useState(false);
+    final selectedCase = useState<CaseHistory?>(null);
 
     if (auth.session == null) {
       return AuthPage(onLogin: auth.login, onRegister: auth.register);
     }
 
     if (isInSettings.value) {
-      return SettingsPage(
+      return SettingsScreen(
         onBack: () {
           isInSettings.value = false;
+        },
+        session: auth.session,
+      );
+    }
+
+    if (selectedCase.value != null) {
+      final precedentsForCase = mockPrecedents;
+      return ResultsPage(
+        case_: selectedCase.value!,
+        precedents: precedentsForCase,
+        onBack: () {
+          selectedCase.value = null;
         },
       );
     }
@@ -63,6 +79,19 @@ class AppController extends HookWidget {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Nova Análise iniciada')));
+      },
+      onSelectCase: (caseItem) {
+        if (caseItem.status == 'completed') {
+          selectedCase.value = caseItem;
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Apenas análises concluídas podem ser visualizadas',
+              ),
+            ),
+          );
+        }
       },
     );
   }
