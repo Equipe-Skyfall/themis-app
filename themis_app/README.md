@@ -39,3 +39,6 @@ AUTH_API_BASE_URL=https://auth.skytrack.space
 - `GET /auth/profile`
 - `POST /users/register` (cadastro, role fixo `USER`)
 
+
+
+
