@@ -9,32 +9,30 @@ class SettingsScreen extends HookWidget {
   final VoidCallback onBack;
   final AuthSession? session;
   final Function(AuthSession)? onProfileUpdated;
+  final Future<void> Function()? onAccountDeleted;
 
   const SettingsScreen({
     Key? key,
     required this.onBack,
     required this.session,
     this.onProfileUpdated,
+    this.onAccountDeleted,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final settings = useSettingsController(session: session);
-    
-    
+
     final usernameController = useTextEditingController();
     final emailController = useTextEditingController();
-    
-    
+
     final currentPasswordController = useTextEditingController();
     final newPasswordController = useTextEditingController();
     final confirmPasswordController = useTextEditingController();
-    
-   
+
     final successMessage = useState<String?>(null);
     final errorMessage = useState<String?>(null);
-    
-    
+
     useEffect(() {
       if (session != null) {
         usernameController.text = session!.user.username;
@@ -42,16 +40,14 @@ class SettingsScreen extends HookWidget {
       }
       return null;
     }, [session]);
-    
-    
+
     Future<void> handleSavePersonalData() async {
       final error = await settings.updateProfile(
         username: usernameController.text,
         email: emailController.text,
       );
-      
+
       if (error == null) {
-        
         if (session != null) {
           final updatedUser = AuthUser(
             id: session!.user.id,
@@ -65,7 +61,7 @@ class SettingsScreen extends HookWidget {
           );
           onProfileUpdated?.call(updatedSession);
         }
-        
+
         successMessage.value = 'Dados pessoais atualizados com sucesso!';
         errorMessage.value = null;
         Future.delayed(const Duration(seconds: 3), () {
@@ -76,24 +72,29 @@ class SettingsScreen extends HookWidget {
         successMessage.value = null;
       }
     }
-    
+
     // Callback para alterar senha
     Future<void> handleChangePassword() async {
+      if (currentPasswordController.text.trim().isEmpty) {
+        errorMessage.value = 'Informe a senha atual.';
+        return;
+      }
+
       if (newPasswordController.text != confirmPasswordController.text) {
         errorMessage.value = 'As senhas não conferem.';
         return;
       }
-      
+
       if (newPasswordController.text.length < 6) {
         errorMessage.value = 'A nova senha deve ter no mínimo 6 caracteres.';
         return;
       }
-      
+
       final error = await settings.changePassword(
         currentPassword: currentPasswordController.text,
         newPassword: newPasswordController.text,
       );
-      
+
       if (error == null) {
         successMessage.value = 'Senha alterada com sucesso!';
         errorMessage.value = null;
@@ -108,7 +109,7 @@ class SettingsScreen extends HookWidget {
         successMessage.value = null;
       }
     }
-    
+
     // Callback para deletar conta
     Future<void> handleDeleteAccount() async {
       final confirmed = await showDialog<bool>(
@@ -131,15 +132,19 @@ class SettingsScreen extends HookWidget {
           ],
         ),
       );
-      
+
       if (confirmed == true) {
         final error = await settings.deleteAccount();
         if (error == null) {
-          // Voltar para login após deletar
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Conta deletada com sucesso')),
             );
+          }
+
+          if (onAccountDeleted != null) {
+            await onAccountDeleted!();
+          } else {
             onBack();
           }
         } else {
@@ -147,7 +152,7 @@ class SettingsScreen extends HookWidget {
         }
       }
     }
-    
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: CustomAppBar(
@@ -160,7 +165,7 @@ class SettingsScreen extends HookWidget {
         child: Column(
           children: [
             const SizedBox(height: 8),
-            
+
             if (errorMessage.value != null)
               Container(
                 width: double.infinity,
@@ -176,7 +181,7 @@ class SettingsScreen extends HookWidget {
                   style: TextStyle(color: Colors.red[700], fontSize: 14),
                 ),
               ),
-            
+
             if (successMessage.value != null)
               Container(
                 width: double.infinity,
@@ -242,7 +247,14 @@ class SettingsScreen extends HookWidget {
                   ),
                   const SizedBox(height: 12),
 
-                  const Text('Email', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF1E1E2C))),
+                  const Text(
+                    'Email',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: Color(0xFF1E1E2C),
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   _EditableField(
                     controller: emailController,
@@ -252,14 +264,21 @@ class SettingsScreen extends HookWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: settings.isLoading ? null : handleSavePersonalData,
+                      onPressed: settings.isLoading
+                          ? null
+                          : handleSavePersonalData,
                       icon: const Icon(Icons.check, size: 18),
                       label: settings.isLoading
                           ? const Text('Salvando...')
                           : const Text('Atualizar Dados'),
                       style: ElevatedButton.styleFrom(
                         elevation: 0,
-                        backgroundColor: const Color.fromARGB(255, 20, 20, 26).withOpacity(0.8),
+                        backgroundColor: const Color.fromARGB(
+                          255,
+                          20,
+                          20,
+                          26,
+                        ).withOpacity(0.8),
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
@@ -326,14 +345,21 @@ class SettingsScreen extends HookWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: settings.isLoading ? null : handleChangePassword,
+                      onPressed: settings.isLoading
+                          ? null
+                          : handleChangePassword,
                       icon: const Icon(Icons.check, size: 18),
                       label: settings.isLoading
                           ? const Text('Atualizando...')
                           : const Text('Atualizar Senha'),
                       style: ElevatedButton.styleFrom(
                         elevation: 0,
-                        backgroundColor: const Color.fromARGB(255, 26, 26, 32).withOpacity(0.8),
+                        backgroundColor: const Color.fromARGB(
+                          255,
+                          26,
+                          26,
+                          32,
+                        ).withOpacity(0.8),
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
@@ -359,7 +385,11 @@ class SettingsScreen extends HookWidget {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.delete_outline, color: Color(0xFFD94841), size: 20),
+                      Icon(
+                        Icons.delete_outline,
+                        color: Color(0xFFD94841),
+                        size: 20,
+                      ),
                       SizedBox(width: 8),
                       Text(
                         'Zona de Perigo',
@@ -384,7 +414,9 @@ class SettingsScreen extends HookWidget {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
-                      onPressed: settings.isLoading ? null : handleDeleteAccount,
+                      onPressed: settings.isLoading
+                          ? null
+                          : handleDeleteAccount,
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 56),
                         side: const BorderSide(color: Color(0xFFF2B8B5)),
@@ -484,7 +516,10 @@ class _EditableField extends StatelessWidget {
         ),
         filled: true,
         fillColor: const Color(0xFFF8FAFC),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
