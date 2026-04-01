@@ -58,6 +58,12 @@ class AppController extends HookWidget {
           isInSettings.value = false;
         },
         session: auth.session,
+<<<<<<< settingsPage
+        onProfileUpdated: auth.updateSession,
+        onForceLogout: () async {
+          isInSettings.value = false;
+          await auth.logout();
+=======
         onProfileUpdated: (updatedSession) {
           auth.setSession(updatedSession);
         },
@@ -85,6 +91,7 @@ class AppController extends HookWidget {
           );
           selectedPrecedents.value = precedents;
           isInUpload.value = false;
+>>>>>>> dev
         },
       );
     }

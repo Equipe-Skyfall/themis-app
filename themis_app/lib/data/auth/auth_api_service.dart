@@ -54,8 +54,8 @@ class AuthUser {
     final id = _pickString(json, ['id', '_id', 'userId', 'sub'], fallback: '');
     final email = _pickString(json, ['email'], fallback: '');
     final username = _pickString(json, [
-      'username',
       'name',
+      'username',
     ], fallback: 'Usuario');
     final role = _pickString(json, ['role'], fallback: 'USER');
 

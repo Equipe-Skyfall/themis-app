@@ -40,3 +40,6 @@ THEMIS_API_BASE_URL=https://themis-back.onrender.com
 - `GET /auth/profile`
 - `POST /users/register` (cadastro, role fixo `USER`)
 
+
+
+

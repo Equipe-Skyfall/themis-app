@@ -54,10 +54,27 @@ class SettingsApiService {
   }) async {
     _assertConfigured();
 
-    final path = '/users/$userId';
+    final payload = {
+      'username': username,
+      'email': email,
+    };
 
-    developer.log('updateUserProfile: POST $path', name: 'SettingsApiService');
+    final candidates = <({String method, String path})>[
+      (method: 'PUT', path: '/users/$userId'),
+      (method: 'PATCH', path: '/users/$userId'),
+    ];
 
+    SettingsApiException? lastError;
+
+<<<<<<< settingsPage
+    for (final candidate in candidates) {
+      final response = await _sendJson(
+        method: candidate.method,
+        path: candidate.path,
+        token: token,
+        payload: payload,
+      );
+=======
     final response = await _httpClient
         .put(
           _uri(path),
@@ -65,15 +82,45 @@ class SettingsApiService {
           body: jsonEncode({'username': username, 'email': email}),
         )
         .timeout(const Duration(seconds: 15));
+>>>>>>> dev
 
-    developer.log(
-      'updateUserProfile: statusCode=${response.statusCode}, body=${response.body}',
-      name: 'SettingsApiService',
-    );
+      developer.log(
+        'updateUserProfile: ${candidate.method} ${candidate.path} statusCode=${response.statusCode}, body=${response.body}',
+        name: 'SettingsApiService',
+      );
 
-    if (!_isSuccess(response.statusCode)) {
-      throw _buildApiException(response: response, method: 'PUT', path: path);
+      if (_isSuccess(response.statusCode)) {
+        return;
+      }
+
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw _buildApiException(
+          response: response,
+          method: candidate.method,
+          path: candidate.path,
+        );
+      }
+
+     
+      if (response.statusCode == 400 ||
+          response.statusCode == 409 ||
+          response.statusCode == 422) {
+        throw _buildApiException(
+          response: response,
+          method: candidate.method,
+          path: candidate.path,
+        );
+      }
+
+      lastError = _buildApiException(
+        response: response,
+        method: candidate.method,
+        path: candidate.path,
+      );
     }
+
+    throw lastError ??
+        const SettingsApiException('Nao foi possivel atualizar o perfil.');
   }
 
   Future<void> changePassword({
@@ -84,6 +131,90 @@ class SettingsApiService {
   }) async {
     _assertConfigured();
 
+<<<<<<< settingsPage
+    final variants = <Map<String, dynamic>>[
+      {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+      {
+        'currentPassword': currentPassword,
+        'password': newPassword,
+      },
+      {
+        'oldPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+      {
+        'old_password': currentPassword,
+        'new_password': newPassword,
+      },
+    ];
+
+    final candidates = <({String method, String path})>[
+      (method: 'PUT', path: '/users/$userId'),
+      (method: 'PATCH', path: '/users/$userId'),
+      (method: 'PUT', path: '/users/$userId/password'),
+      (method: 'PATCH', path: '/users/$userId/password'),
+    ];
+
+    SettingsApiException? lastError;
+
+    for (final candidate in candidates) {
+      for (final payload in variants) {
+        final response = await _sendJson(
+          method: candidate.method,
+          path: candidate.path,
+          token: token,
+          payload: payload,
+        );
+
+        developer.log(
+          'changePassword: ${candidate.method} ${candidate.path} payloadKeys=${payload.keys.toList()} statusCode=${response.statusCode}, body=${response.body}',
+          name: 'SettingsApiService',
+        );
+
+        if (_isSuccess(response.statusCode)) {
+          return;
+        }
+
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          throw _buildApiException(
+            response: response,
+            method: candidate.method,
+            path: candidate.path,
+          );
+        }
+
+        if (response.statusCode == 409) {
+          throw _buildApiException(
+            response: response,
+            method: candidate.method,
+            path: candidate.path,
+          );
+        }
+
+        // Senha atual incorreta deve parar e retornar para o usuario.
+        if (response.statusCode == 400 || response.statusCode == 422) {
+          final apiError = _buildApiException(
+            response: response,
+            method: candidate.method,
+            path: candidate.path,
+          );
+          if (_looksLikeCurrentPasswordError(apiError.message, response.body)) {
+            throw apiError;
+          }
+
+          throw apiError;
+        }
+
+        lastError = _buildApiException(
+          response: response,
+          method: candidate.method,
+          path: candidate.path,
+        );
+      }
+=======
     final payload = {
       'currentPassword': currentPassword,
       'oldPassword': currentPassword,
@@ -140,6 +271,7 @@ class SettingsApiService {
       }
 
       lastError = apiError;
+>>>>>>> dev
     }
 
     throw lastError ??
@@ -222,14 +354,72 @@ class SettingsApiService {
     final parsedMessage = parsed != null
         ? _pickText(parsed, ['message', 'detail', 'error', 'title'])
         : null;
+    final errorContext = _buildErrorContext(parsed, response.body);
+
+    if (_isValidationFailed(parsedMessage, errorContext)) {
+      if (_containsAny(errorContext, ['username', 'nome'])) {
+        if (_containsAny(errorContext, ['already', 'exists', 'taken', 'duplic'])) {
+          return 'Nome de usuario ja utilizado.';
+        }
+        if (_containsAny(errorContext, ['3', 'min', 'minimum', 'at least'])) {
+          return 'Nome de usuario invalido. Use ao menos 3 caracteres.';
+        }
+        return 'Nome de usuario invalido. Verifique e tente novamente.';
+      }
+
+      if (_containsAny(errorContext, ['email'])) {
+        if (_containsAny(errorContext, ['already', 'exists', 'taken', 'duplic'])) {
+          return 'Email ja utilizado.';
+        }
+        return 'Email invalido. Verifique e tente novamente.';
+      }
+
+      return 'Dados invalidos. Verifique os campos e tente novamente.';
+    }
+
+    if (response.statusCode == 409) {
+      if (_containsAny(errorContext, ['username', 'nome'])) {
+        return 'Nome de usuario ja utilizado.';
+      }
+      if (_containsAny(errorContext, ['email'])) {
+        return 'Email ja utilizado.';
+      }
+      return 'Conflito de dados. Verifique os campos e tente novamente.';
+    }
+
+    if (_containsAny(errorContext, [
+      'password',
+      'senha',
+      'current password',
+      'old password',
+    ])) {
+      if (_containsAny(errorContext, [
+        'incorrect',
+        'invalid',
+        'wrong',
+        'mismatch',
+        'nao confere',
+        'incorreta',
+      ])) {
+        return 'Senha atual incorreta.';
+      }
+    }
 
     if (parsedMessage != null && parsedMessage.isNotEmpty) {
+<<<<<<< settingsPage
+      if (parsedMessage.trim().toLowerCase() == 'something went wrong') {
+        if (_containsAny(errorContext, ['password', 'senha'])) {
+          return 'Nao foi possivel alterar a senha. Verifique a senha atual e tente novamente.';
+        }
+        return 'Nao foi possivel concluir a operacao. Tente novamente.';
+=======
       final lowered = parsedMessage.toLowerCase();
       if (path.contains('password') || path.contains('/users/')) {
         if (lowered.contains('something went wrong') ||
             lowered.contains('internal server error')) {
           return 'Nao foi possivel alterar a senha agora. Verifique a senha atual e tente novamente.';
         }
+>>>>>>> dev
       }
       return parsedMessage;
     }
@@ -243,6 +433,9 @@ class SettingsApiService {
     }
 
     if (response.statusCode == 400) {
+      if (_containsAny(errorContext, ['password', 'senha'])) {
+        return 'Nao foi possivel alterar a senha. Verifique os dados informados.';
+      }
       return 'Dados invalidos. Verifique os campos e tente novamente.';
     }
 
@@ -292,5 +485,98 @@ class SettingsApiService {
       }
     }
     return null;
+  }
+
+  String _buildErrorContext(Map<String, dynamic>? json, String rawBody) {
+    final parts = <String>[rawBody];
+
+    void visit(dynamic value) {
+      if (value is String && value.trim().isNotEmpty) {
+        parts.add(value.trim());
+      } else if (value is Map) {
+        for (final entry in value.entries) {
+          if (entry.key is String) {
+            parts.add((entry.key as String).trim());
+          }
+          visit(entry.value);
+        }
+      } else if (value is Iterable) {
+        for (final item in value) {
+          visit(item);
+        }
+      }
+    }
+
+    if (json != null) {
+      visit(json);
+    }
+
+    return parts.join(' ').toLowerCase();
+  }
+
+  bool _isValidationFailed(String? parsedMessage, String errorContext) {
+    if (parsedMessage != null &&
+        parsedMessage.toLowerCase().contains('validation failed')) {
+      return true;
+    }
+
+    return _containsAny(errorContext, [
+      'validation failed',
+      'validationerror',
+      'bad request',
+      'is invalid',
+      'must be',
+      'should not be empty',
+      'deve',
+      'invalido',
+    ]);
+  }
+
+  bool _containsAny(String source, List<String> terms) {
+    for (final term in terms) {
+      if (source.contains(term.toLowerCase())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<http.Response> _sendJson({
+    required String method,
+    required String path,
+    required String token,
+    required Map<String, dynamic> payload,
+  }) async {
+    final uri = _uri(path);
+    final headers = _headers(token: token);
+
+    switch (method) {
+      case 'PUT':
+        return _httpClient
+            .put(uri, headers: headers, body: jsonEncode(payload))
+            .timeout(const Duration(seconds: 15));
+      case 'PATCH':
+        return _httpClient
+            .patch(uri, headers: headers, body: jsonEncode(payload))
+            .timeout(const Duration(seconds: 15));
+      case 'POST':
+        return _httpClient
+            .post(uri, headers: headers, body: jsonEncode(payload))
+            .timeout(const Duration(seconds: 15));
+      default:
+        throw SettingsApiException('Metodo HTTP nao suportado: $method');
+    }
+  }
+
+  bool _looksLikeCurrentPasswordError(String message, String responseBody) {
+    final source = '$message $responseBody'.toLowerCase();
+    return _containsAny(source, [
+      'senha atual',
+      'current password',
+      'old password',
+      'incorrect',
+      'invalid password',
+      'wrong password',
+    ]);
   }
 }

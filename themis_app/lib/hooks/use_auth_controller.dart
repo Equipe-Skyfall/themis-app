@@ -15,6 +15,7 @@ class AuthController {
   final void Function(AuthSession nextSession) setSession;
   final Future<void> Function() clearSession;
   final Future<void> Function() logout;
+  final void Function(AuthSession nextSession) updateSession;
 
   const AuthController({
     required this.session,
@@ -23,6 +24,7 @@ class AuthController {
     required this.setSession,
     required this.clearSession,
     required this.logout,
+    required this.updateSession,
   });
 }
 
@@ -117,6 +119,10 @@ AuthController useAuthController({AuthApiService? service}) {
     }
   }
 
+  void updateSession(AuthSession nextSession) {
+    session.value = nextSession;
+  }
+
   return AuthController(
     session: session.value,
     login: login,
@@ -124,5 +130,6 @@ AuthController useAuthController({AuthApiService? service}) {
     setSession: setSession,
     clearSession: clearSession,
     logout: logout,
+    updateSession: updateSession,
   );
 }

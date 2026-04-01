@@ -137,6 +137,7 @@ class AuthPage extends HookWidget {
                       label: 'Nome de usuario',
                       hintText: 'Insira seu nome de usuario aqui',
                       controller: authForm.nameController,
+                      style: const TextStyle(color: Colors.grey),
                     ),
                     const SizedBox(height: 16),
                   ],
@@ -144,6 +145,7 @@ class AuthPage extends HookWidget {
                     label: 'E-mail',
                     hintText: 'Insira seu email aqui',
                     controller: authForm.emailController,
+                    style: const TextStyle(color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
@@ -151,6 +153,7 @@ class AuthPage extends HookWidget {
                     hintText: '••••••••',
                     obscureText: true,
                     controller: authForm.passwordController,
+                    style: const TextStyle(color: Colors.grey),
                   ),
                   if (authForm.errorMessage != null) ...[
                     const SizedBox(height: 12),
