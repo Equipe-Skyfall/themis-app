@@ -66,6 +66,7 @@ class SettingsApiService {
 
     SettingsApiException? lastError;
 
+<<<<<<< settingsPage
     for (final candidate in candidates) {
       final response = await _sendJson(
         method: candidate.method,
@@ -73,6 +74,15 @@ class SettingsApiService {
         token: token,
         payload: payload,
       );
+=======
+    final response = await _httpClient
+        .put(
+          _uri(path),
+          headers: _headers(token: token),
+          body: jsonEncode({'username': username, 'email': email}),
+        )
+        .timeout(const Duration(seconds: 15));
+>>>>>>> dev
 
       developer.log(
         'updateUserProfile: ${candidate.method} ${candidate.path} statusCode=${response.statusCode}, body=${response.body}',
@@ -121,6 +131,7 @@ class SettingsApiService {
   }) async {
     _assertConfigured();
 
+<<<<<<< settingsPage
     final variants = <Map<String, dynamic>>[
       {
         'currentPassword': currentPassword,
@@ -203,6 +214,64 @@ class SettingsApiService {
           path: candidate.path,
         );
       }
+=======
+    final payload = {
+      'currentPassword': currentPassword,
+      'oldPassword': currentPassword,
+      'password': newPassword,
+      'newPassword': newPassword,
+    };
+
+    final attempts = [
+      (method: 'PUT', path: '/users/$userId', body: payload),
+      (method: 'PUT', path: '/users/$userId/password', body: payload),
+      (
+        method: 'POST',
+        path: '/auth/change-password',
+        body: {...payload, 'userId': userId},
+      ),
+    ];
+
+    SettingsApiException? lastError;
+
+    for (final attempt in attempts) {
+      final method = attempt.method;
+      final path = attempt.path;
+
+      developer.log(
+        'changePassword: $method $path',
+        name: 'SettingsApiService',
+      );
+
+      final response = await _sendJson(
+        method: method,
+        path: path,
+        token: token,
+        body: attempt.body,
+      );
+
+      developer.log(
+        'changePassword: statusCode=${response.statusCode}, body=${response.body}',
+        name: 'SettingsApiService',
+      );
+
+      if (_isSuccess(response.statusCode)) {
+        return;
+      }
+
+      final apiError = _buildApiException(
+        response: response,
+        method: method,
+        path: path,
+      );
+
+      // Credenciais/sessao invalidas nao devem tentar fallback.
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw apiError;
+      }
+
+      lastError = apiError;
+>>>>>>> dev
     }
 
     throw lastError ??
@@ -218,14 +287,15 @@ class SettingsApiService {
     final path = '/users/$userId';
 
     final response = await _httpClient
-        .delete(
-          _uri(path),
-          headers: _headers(token: token),
-        )
+        .delete(_uri(path), headers: _headers(token: token))
         .timeout(const Duration(seconds: 15));
 
     if (!_isSuccess(response.statusCode)) {
-      throw _buildApiException(response: response, method: 'DELETE', path: path);
+      throw _buildApiException(
+        response: response,
+        method: 'DELETE',
+        path: path,
+      );
     }
   }
 
@@ -251,6 +321,29 @@ class SettingsApiService {
 
   bool _isSuccess(int statusCode) {
     return statusCode >= 200 && statusCode < 300;
+  }
+
+  Future<http.Response> _sendJson({
+    required String method,
+    required String path,
+    required String token,
+    required Map<String, dynamic> body,
+  }) async {
+    final uri = _uri(path);
+    final headers = _headers(token: token);
+    final encodedBody = jsonEncode(body);
+
+    switch (method.toUpperCase()) {
+      case 'POST':
+        return _httpClient
+            .post(uri, headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 15));
+      case 'PUT':
+      default:
+        return _httpClient
+            .put(uri, headers: headers, body: encodedBody)
+            .timeout(const Duration(seconds: 15));
+    }
   }
 
   String _errorMessage({
@@ -313,11 +406,20 @@ class SettingsApiService {
     }
 
     if (parsedMessage != null && parsedMessage.isNotEmpty) {
+<<<<<<< settingsPage
       if (parsedMessage.trim().toLowerCase() == 'something went wrong') {
         if (_containsAny(errorContext, ['password', 'senha'])) {
           return 'Nao foi possivel alterar a senha. Verifique a senha atual e tente novamente.';
         }
         return 'Nao foi possivel concluir a operacao. Tente novamente.';
+=======
+      final lowered = parsedMessage.toLowerCase();
+      if (path.contains('password') || path.contains('/users/')) {
+        if (lowered.contains('something went wrong') ||
+            lowered.contains('internal server error')) {
+          return 'Nao foi possivel alterar a senha agora. Verifique a senha atual e tente novamente.';
+        }
+>>>>>>> dev
       }
       return parsedMessage;
     }

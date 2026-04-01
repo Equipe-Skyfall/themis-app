@@ -143,6 +143,10 @@ class AuthApiService {
 
     final userFromLogin = _extractUser(parsed);
     if (userFromLogin != null) {
+      if (userFromLogin.id.isEmpty && token != null && token.isNotEmpty) {
+        final profile = await getProfile(token: token);
+        return AuthSession(user: profile, token: token);
+      }
       return AuthSession(user: userFromLogin, token: token);
     }
 
