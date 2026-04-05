@@ -30,65 +30,15 @@ class ResultsPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[200]!),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'RESUMO DO CASO',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[600],
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    case_.title,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E1E2C),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris ante nunc, ullamcorper a lorem vitae, consectetur gravida felis. Sed vitae eros molestie phasellus sollicitudin volutpat felis. Phasellus fringilla faucibus eros vestibatis tellus sed tiled venenatis, luctus sem sit amet, volutpat pharetra tortor sit sed sodales. Sed tiled venenatis, luctus sem sit amet, volutpat amet, mattis nec eg',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[700],
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-
             const Text(
               'Precedentes Encontrados',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
                 color: Color(0xFF1E1E2C),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
 
             ...precedents.map((precedent) {
               return _PrecedentCard(
@@ -96,6 +46,21 @@ class ResultsPage extends StatelessWidget {
                 onTap: () => showPrecedentSheet(context, precedent),
               );
             }).toList(),
+
+            if (precedents.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Text(
+                  'Nenhum precedente encontrado para este arquivo.',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ),
           ],
         ),
       ),
@@ -109,15 +74,7 @@ class _PrecedentCard extends StatelessWidget {
 
   const _PrecedentCard({required this.precedent, required this.onTap});
 
-  Color _getSimilarityColor(double similarity) {
-    if (similarity >= 80) {
-      return Colors.green;
-    } else if (similarity >= 60) {
-      return Colors.orange;
-    } else {
-      return Colors.red;
-    }
-  }
+  static const _similarityColor = Color(0xFF1D2A7A);
 
   Color _getStatusColor(String status) {
     switch (status) {
@@ -146,6 +103,37 @@ class _PrecedentCard extends StatelessWidget {
     }
   }
 
+  Color _getStatusBackground(String status) {
+    return _getStatusColor(status).withOpacity(0.12);
+  }
+
+  String _buildMeta() {
+    final normalizedStatus = _normalize(_getStatusLabel(precedent.status));
+    final legal = precedent.legalStatus.trim();
+    if (legal.isEmpty || _normalize(legal) == normalizedStatus) {
+      return precedent.tribunal;
+    }
+    return '${precedent.tribunal} · $legal';
+  }
+
+  String _normalize(String input) {
+    return input
+        .toLowerCase()
+        .trim()
+        .replaceAll('á', 'a')
+        .replaceAll('à', 'a')
+        .replaceAll('ã', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('ê', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ô', 'o')
+        .replaceAll('õ', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ç', 'c');
+  }
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -158,6 +146,13 @@ class _PrecedentCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey[200]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,72 +167,82 @@ class _PrecedentCard extends StatelessWidget {
                       Text(
                         precedent.title,
                         style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
                           color: Color(0xFF1E1E2C),
+                          height: 1.15,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        precedent.tribunal,
+                        _buildMeta(),
                         style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                          color: const Color(0xFF74839A),
+                          fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getSimilarityColor(
-                      precedent.similarity,
-                    ).withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '${precedent.similarity.toStringAsFixed(0)}%',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: _getSimilarityColor(precedent.similarity),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${precedent.similarity.toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: _similarityColor,
+                        height: 1,
+                      ),
                     ),
-                  ),
+                    Text(
+                      'similaridade',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 11),
+                    ),
+                  ],
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
               precedent.theme,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-                height: 1.4,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF5F728D),
+                height: 1.2,
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _getStatusColor(precedent.status).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                _getStatusLabel(precedent.status),
-                style: TextStyle(
-                  color: _getStatusColor(precedent.status),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getStatusBackground(precedent.status),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _getStatusLabel(precedent.status),
+                    style: TextStyle(
+                      color: _getStatusColor(precedent.status),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         ),
