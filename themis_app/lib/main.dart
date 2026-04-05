@@ -58,12 +58,10 @@ class AppController extends HookWidget {
           isInSettings.value = false;
         },
         session: auth.session,
-        onProfileUpdated: (updatedSession) {
-          auth.setSession(updatedSession);
-        },
-        onAccountDeleted: () async {
-          await auth.clearSession();
+        onProfileUpdated: auth.updateSession,
+        onForceLogout: () async {
           isInSettings.value = false;
+          await auth.logout();
         },
       );
     }

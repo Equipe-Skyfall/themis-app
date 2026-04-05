@@ -54,8 +54,8 @@ class AuthUser {
     final id = _pickString(json, ['id', '_id', 'userId', 'sub'], fallback: '');
     final email = _pickString(json, ['email'], fallback: '');
     final username = _pickString(json, [
-      'username',
       'name',
+      'username',
     ], fallback: 'Usuario');
     final role = _pickString(json, ['role'], fallback: 'USER');
 
@@ -143,10 +143,6 @@ class AuthApiService {
 
     final userFromLogin = _extractUser(parsed);
     if (userFromLogin != null) {
-      if (userFromLogin.id.isEmpty && token != null && token.isNotEmpty) {
-        final profile = await getProfile(token: token);
-        return AuthSession(user: profile, token: token);
-      }
       return AuthSession(user: userFromLogin, token: token);
     }
 
