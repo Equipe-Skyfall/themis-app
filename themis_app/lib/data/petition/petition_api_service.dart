@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class PetitionApiException implements Exception {
   final String message;
@@ -42,7 +43,12 @@ class PetitionApiService {
     final request = http.MultipartRequest('POST', _uri('/petition/analyze'));
     request.headers['Authorization'] = 'Bearer $token';
     request.files.add(
-      http.MultipartFile.fromBytes('file', pdfBytes, filename: fileName),
+      http.MultipartFile.fromBytes(
+        'file',
+        pdfBytes,
+        filename: fileName,
+        contentType: MediaType('application', 'pdf'),
+      ),
     );
 
     final streamedResponse = await request.send().timeout(
@@ -96,6 +102,11 @@ class PetitionApiService {
 
     if (response.statusCode == 400) {
       return fromBody ?? 'Arquivo invalido. Envie um PDF valido.';
+    }
+
+    if (response.statusCode == 500) {
+      return fromBody ??
+          'Falha interna ao analisar peticao. Tente novamente em instantes.';
     }
 
     return fromBody ?? 'Falha ao analisar peticao (${response.statusCode}).';
