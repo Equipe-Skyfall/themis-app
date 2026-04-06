@@ -37,6 +37,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   tailwindcss_build: ^0.5.0
   http: ^1.2.2
+  http_parser: ^4.0.2
   flutter_dotenv: ^5.1.0
   flutter_hooks: ^0.21.3+1
   file_picker: ^10.3.10
