@@ -9,7 +9,8 @@ class UploadPetitionController {
   final bool isSubmitting;
   final String? errorMessage;
   final Future<void> Function() pickPDF;
-  final Future<List<Precedent>?> Function() generateAnalysis;
+  final Future<List<Precedent>?> Function({required int limit})
+  generateAnalysis;
 
   const UploadPetitionController({
     required this.selectedFile,
@@ -47,9 +48,14 @@ UploadPetitionController useUploadPetitionController({
     errorMessage.value = null;
   }
 
-  Future<List<Precedent>?> generateAnalysis() async {
+  Future<List<Precedent>?> generateAnalysis({required int limit}) async {
     if (token == null || token.isEmpty) {
       errorMessage.value = 'Sessao expirada. Faca login novamente.';
+      return null;
+    }
+
+    if (limit <= 0) {
+      errorMessage.value = 'Quantidade de precedentes invalida.';
       return null;
     }
 
@@ -74,6 +80,7 @@ UploadPetitionController useUploadPetitionController({
         token: token,
         fileName: currentFile.name,
         pdfBytes: bytes,
+        candidates: limit,
       );
 
       return rawResults.map(_toPrecedent).toList();
