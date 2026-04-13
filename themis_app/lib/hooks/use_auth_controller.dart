@@ -11,12 +11,14 @@ class AuthController {
     required String password,
   }) register;
   final Future<void> Function() logout;
+  final void Function(AuthSession nextSession) updateSession;
 
   const AuthController({
     required this.session,
     required this.login,
     required this.register,
     required this.logout,
+    required this.updateSession,
   });
 }
 
@@ -65,10 +67,15 @@ AuthController useAuthController({AuthApiService? service}) {
     }
   }
 
+  void updateSession(AuthSession nextSession) {
+    session.value = nextSession;
+  }
+
   return AuthController(
     session: session.value,
     login: login,
     register: register,
     logout: logout,
+    updateSession: updateSession,
   );
 }

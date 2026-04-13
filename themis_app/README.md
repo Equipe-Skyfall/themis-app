@@ -28,6 +28,7 @@ flutter run -d windows
 
 ```env
 AUTH_API_BASE_URL=https://auth.skytrack.space
+THEMIS_API_BASE_URL=https://themis-back.onrender.com
 ```
 
 2. Se quiser recriar o arquivo localmente, use `.env.example` como base.

@@ -22,9 +22,7 @@ class DashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final completedCount = mockCases
-        .where((item) => item.status == 'completed')
-        .length;
+    const completedCount = 0;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -158,69 +156,6 @@ class DashboardPage extends StatelessWidget {
                     ),
                     const Icon(Icons.chevron_right, color: Colors.white54),
                   ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'Analises Recentes',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            ...mockCases.map(
-              (item) => Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[200]!),
-                ),
-                child: ListTile(
-                  title: Text(
-                    item.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    '${item.date} · ${item.matchCount} precedentes',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getStatusColor(item.status).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          _getStatusLabel(item.status),
-                          style: TextStyle(
-                            color: _getStatusColor(item.status),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        Icons.chevron_right,
-                        color: Colors.grey[400],
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                  onTap: () {
-                    onSelectCase?.call(item);
-                  },
                 ),
               ),
             ),
