@@ -37,11 +37,17 @@ class PetitionApiService {
     required String token,
     required String fileName,
     required Uint8List pdfBytes,
+    required int candidates,
   }) async {
     _assertConfigured();
 
+    if (candidates <= 0) {
+      throw const PetitionApiException('Quantidade de precedentes invalida.');
+    }
+
     final request = http.MultipartRequest('POST', _uri('/petition/analyze'));
     request.headers['Authorization'] = 'Bearer $token';
+    request.fields['candidates'] = candidates.toString();
     request.files.add(
       http.MultipartFile.fromBytes(
         'file',
