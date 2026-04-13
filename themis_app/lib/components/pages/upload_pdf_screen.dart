@@ -80,7 +80,7 @@ class UploadScreen extends HookWidget {
       if (precedents.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Nenhum precedente encontrado.')),
+            const SnackBar(content: Text('Nenhum precedente eFEncontrado.')),
           );
         }
         return;
