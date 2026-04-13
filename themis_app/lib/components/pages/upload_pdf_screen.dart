@@ -24,10 +24,14 @@ class UploadScreen extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final upload = useUploadPetitionController(token: token);
     final hasFile = upload.selectedFile != null;
     final isLoadingScreenVisible = useState(false);
     final loadingStep = useState(0);
+    final resultsLimit = useState(10);
+    final limitController = useTextEditingController(text: '10');
+    final limitError = useState<String?>(null);
 
     useEffect(() {
       if (!isLoadingScreenVisible.value) {
@@ -45,9 +49,23 @@ class UploadScreen extends HookWidget {
     }, [isLoadingScreenVisible.value]);
 
     Future<void> onGeneratePressed() async {
+      final parsedLimit = int.tryParse(limitController.text.trim());
+      if (parsedLimit == null || parsedLimit <= 0) {
+        limitError.value = 'Informe um numero inteiro maior que zero.';
+        return;
+      }
+
+      if (parsedLimit > 20) {
+        limitError.value =
+            'Para manter a performance, use no maximo 20 resultados.';
+        return;
+      }
+
+      resultsLimit.value = parsedLimit;
+      limitError.value = null;
       isLoadingScreenVisible.value = true;
 
-      final precedents = await upload.generateAnalysis();
+      final precedents = await upload.generateAnalysis(limit: parsedLimit);
       isLoadingScreenVisible.value = false;
 
       if (precedents == null) {
@@ -69,7 +87,8 @@ class UploadScreen extends HookWidget {
       }
 
       final fileName = upload.selectedFile?.name ?? 'Peticao';
-      onAnalysisReady?.call('Analise - $fileName', precedents);
+      final limitedPrecedents = precedents.take(parsedLimit).toList();
+      onAnalysisReady?.call('Analise - $fileName', limitedPrecedents);
     }
 
     if (isLoadingScreenVisible.value) {
@@ -100,6 +119,90 @@ class UploadScreen extends HookWidget {
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 20),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colorScheme.outlineVariant),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Quantidade de precedentes',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [5, 10, 20].map((option) {
+                      final selected = resultsLimit.value == option;
+                      return ChoiceChip(
+                        label: Text('$option'),
+                        selected: selected,
+                        onSelected: (_) {
+                          resultsLimit.value = option;
+                          limitController.text = option.toString();
+                          limitError.value = null;
+                        },
+                        backgroundColor: colorScheme.surfaceVariant,
+                        selectedColor: colorScheme.primary,
+                        labelStyle: TextStyle(
+                          color: selected
+                              ? colorScheme.onPrimary
+                              : colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        side: BorderSide(color: colorScheme.outlineVariant),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: limitController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Ou digite a quantidade desejada',
+                      hintText: 'Ex.: 15',
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: colorScheme.outlineVariant,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: colorScheme.outlineVariant,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: colorScheme.primary),
+                      ),
+                      errorText: limitError.value,
+                    ),
+                    onChanged: (_) {
+                      if (limitError.value != null) {
+                        limitError.value = null;
+                      }
+                    },
+                    onSubmitted: (value) {
+                      final parsed = int.tryParse(value.trim());
+                      if (parsed != null && parsed > 0 && parsed <= 100) {
+                        resultsLimit.value = parsed;
+                        limitError.value = null;
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
 
             GestureDetector(
               onTap: upload.pickPDF,
