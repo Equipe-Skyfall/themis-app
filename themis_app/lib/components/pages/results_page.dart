@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../ui/app_bar.dart';
 import '../ui/precedent_sheet.dart';
 import '../../lib/models.dart';
