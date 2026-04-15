@@ -148,7 +148,7 @@ class _ResultsPageState extends State<ResultsPage> {
                         option.status,
                       );
                       return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3r),
+                        padding: const EdgeInsets.symmetric(vertical: 3),
                         child: SizedBox(
                           width: double.infinity,
                           height: 40,
