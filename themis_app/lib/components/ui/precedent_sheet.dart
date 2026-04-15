@@ -177,11 +177,16 @@ class _PrecedentSheetUI extends StatelessWidget {
             ),
             const SizedBox(height: 18),
 
-            _buildField('Tema', _displayValue(precedent.theme)),
-            _buildField('Status', _formatLegalStatus(precedent.legalStatus)),
-            _buildField('Explicacao', explanationText),
+            _buildField(
+              'Tema do Precedente',
+              _displayValue(precedent.theme),
+              labelColor: const Color(0xFF1E5EFF),
+            ),
+            _buildField('Explicação', explanationText,               labelColor: const Color(0xFF1E5EFF),),
             if (shouldShowEnunciado) _buildField('Enunciado', enunciadoText),
-            _buildField('Tese Firmada', _displayValue(precedent.thesis)),
+            
+            _buildField('Tese Firmada', _displayValue(precedent.thesis),labelColor: const Color(0xFF1E5EFF),
+),
 
             SizedBox(
               width: double.infinity,
@@ -207,7 +212,7 @@ class _PrecedentSheetUI extends StatelessWidget {
     );
   }
 
-  Widget _buildField(String label, String value) {
+  Widget _buildField(String label, String value, {Color? labelColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -218,7 +223,7 @@ class _PrecedentSheetUI extends StatelessWidget {
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
-              color: Colors.grey[700],
+              color: labelColor ?? Colors.grey[700],
             ),
           ),
           const SizedBox(height: 4),
