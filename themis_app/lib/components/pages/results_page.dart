@@ -111,7 +111,8 @@ class _ResultsPageState extends State<ResultsPage> {
                 border: Border.all(color: Colors.grey[200]!),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Row(
                     children: [
@@ -140,28 +141,49 @@ class _ResultsPageState extends State<ResultsPage> {
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: _applicabilityOptions.map((option) {
                       final selected = _selectedApplicability.contains(
                         option.status,
                       );
-                      return FilterChip(
-                        label: Text(option.label),
-                        selected: selected,
-                        onSelected: (_) => _toggleFilter(option.status),
-                        showCheckmark: false,
-                        backgroundColor: Colors.grey[100],
-                        selectedColor: option.color.withOpacity(0.14),
-                        side: BorderSide(
-                          color: selected ? option.color : Colors.grey[300]!,
-                        ),
-                        labelStyle: TextStyle(
-                          color: selected
-                              ? option.color
-                              : const Color(0xFF334155),
-                          fontWeight: FontWeight.w700,
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3r),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 40,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _toggleFilter(option.status),
+                              borderRadius: BorderRadius.circular(24),
+                              child: Ink(
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? option.color.withOpacity(0.14)
+                                      : Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: selected
+                                        ? option.color
+                                        : Colors.grey[300]!,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    option.label,
+                                    style: TextStyle(
+                                      color: selected
+                                          ? option.color
+                                          : const Color(0xFF334155),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       );
                     }).toList(),
