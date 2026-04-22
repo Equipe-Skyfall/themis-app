@@ -222,7 +222,9 @@ class _PrecedentCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -237,6 +239,24 @@ class _PrecedentCard extends StatelessWidget {
                     _getStatusLabel(precedent.status),
                     style: TextStyle(
                       color: _getStatusColor(precedent.status),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E5EFF).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    precedent.situacao,
+                    style: const TextStyle(
+                      color: Color(0xFF1E5EFF),
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),

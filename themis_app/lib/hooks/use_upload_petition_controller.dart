@@ -111,6 +111,7 @@ Precedent _toPrecedent(Map<String, dynamic> item) {
   final enunciado =
       _pickFirstText(item, ['textoEmenta', 'textoDecisao']) ?? explanation;
   final tese = (item['tese'] ?? '').toString().trim();
+  final situacao = _mapSituacao((item['situacao'] ?? '').toString());
 
   return Precedent(
     id: rawId,
@@ -119,11 +120,26 @@ Precedent _toPrecedent(Map<String, dynamic> item) {
     similarity: _toDouble(item['similarity_score']),
     status: status,
     legalStatus: (item['relevance_label'] ?? '').toString(),
+    situacao: situacao,
     theme: (item['questao'] ?? 'Tema nao informado').toString(),
     thesis: tese.isNotEmpty ? tese : explanation,
     summary: enunciado.isNotEmpty ? enunciado : 'Nao informado',
     whyApplies: explanation.isNotEmpty ? explanation : 'Nao informado',
   );
+}
+
+String _mapSituacao(String raw) {
+  final value = raw.trim();
+  if (value.isEmpty) {
+    return value;
+  }
+
+  final normalized = _normalizeLabel(value);
+  if (normalized == 'admitido_possivel_revisao_tese') {
+    return 'Admitido (possível revisão de tese)';
+  }
+
+  return value;
 }
 
 String _normalizeLabel(String raw) {
