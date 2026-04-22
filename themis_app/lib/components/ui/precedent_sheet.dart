@@ -1,4 +1,3 @@
-// themis_app/lib/components/precedent_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:themis_app/lib/models.dart';
 
@@ -64,10 +63,9 @@ class _PrecedentSheetUI extends StatelessWidget {
       '\n',
     );
 
-    // Remove outras tags HTML eventualmente vindas do backend.
+
     text = text.replaceAll(RegExp(r'<[^>]*>'), '');
 
-    // Decodifica entidades HTML comuns.
     text = text
         .replaceAll('&nbsp;', ' ')
         .replaceAll('&amp;', '&')
@@ -76,7 +74,6 @@ class _PrecedentSheetUI extends StatelessWidget {
         .replaceAll('&quot;', '"')
         .replaceAll('&#39;', "'");
 
-    // Limpa espaços extras por linha e reduz múltiplas linhas vazias.
     final lines = text
         .split('\n')
         .map((line) => line.trim())

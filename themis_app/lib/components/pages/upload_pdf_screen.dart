@@ -122,68 +122,125 @@ class UploadScreen extends HookWidget {
 
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: colorScheme.outlineVariant),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Quantidade de precedentes',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.filter_list_rounded,
+                          size: 18,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Quantidade de precedentes',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: Color(0xFF1E1E2C),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Escolha um valor rápido ou digite manualmente.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 14),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [5, 10, 20].map((option) {
                       final selected = resultsLimit.value == option;
                       return ChoiceChip(
-                        label: Text('$option'),
+                        label: Text(
+                          '$option',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF374151),
+                          ),
+                        ),
                         selected: selected,
                         onSelected: (_) {
                           resultsLimit.value = option;
                           limitController.text = option.toString();
                           limitError.value = null;
                         },
-                        backgroundColor: colorScheme.surfaceVariant,
-                        selectedColor: colorScheme.primary,
-                        labelStyle: TextStyle(
-                          color: selected
-                              ? colorScheme.onPrimary
-                              : colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        backgroundColor: Colors.grey.shade100,
+                        selectedColor: const Color(0xFF1E1E2C),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         side: BorderSide(color: colorScheme.outlineVariant),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: limitController,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
-                      labelText: 'Ou digite a quantidade desejada',
+                      labelText: 'Quantidade de precedentes',
                       hintText: 'Ex.: 15',
+                      prefixIcon: const Icon(Icons.numbers_rounded),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
                       isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
                           color: colorScheme.outlineVariant,
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
                           color: colorScheme.outlineVariant,
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(color: colorScheme.primary),
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF1E1E2C)),
                       ),
                       errorText: limitError.value,
                     ),

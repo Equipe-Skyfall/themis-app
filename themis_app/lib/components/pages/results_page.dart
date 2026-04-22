@@ -3,7 +3,7 @@ import '../ui/app_bar.dart';
 import '../ui/precedent_sheet.dart';
 import '../../lib/models.dart';
 
-class ResultsPage extends StatelessWidget {
+class ResultsPage extends StatefulWidget {
   final CaseHistory case_;
   final List<Precedent> precedents;
   final VoidCallback onBack;
@@ -16,12 +16,74 @@ class ResultsPage extends StatelessWidget {
   });
 
   @override
+  State<ResultsPage> createState() => _ResultsPageState();
+}
+
+class _ResultsPageState extends State<ResultsPage> {
+  final Set<String> _selectedApplicability = <String>{};
+
+  static const List<_ApplicabilityFilterOption> _applicabilityOptions = [
+    _ApplicabilityFilterOption(
+      status: 'applicable',
+      label: 'Aplicável',
+      color: Color(0xFF4CAF50),
+    ),
+    _ApplicabilityFilterOption(
+      status: 'possibly_applicable',
+      label: 'Possivelmente aplicável',
+      color: Color(0xFFF9A825),
+    ),
+    _ApplicabilityFilterOption(
+      status: 'not_applicable',
+      label: 'Não aplicável',
+      color: Color(0xFFD94841),
+    ),
+  ];
+
+  List<Precedent> get _visiblePrecedents {
+    if (_selectedApplicability.isEmpty) {
+      return widget.precedents;
+    }
+
+    return widget.precedents.where((precedent) {
+      return _selectedApplicability.contains(
+        _normalizeStatus(precedent.status),
+      );
+    }).toList();
+  }
+
+  String _normalizeStatus(String status) {
+    if (status == 'preliminary') {
+      return 'possibly_applicable';
+    }
+    return status;
+  }
+
+  void _toggleFilter(String status) {
+    setState(() {
+      if (_selectedApplicability.contains(status)) {
+        _selectedApplicability.remove(status);
+      } else {
+        _selectedApplicability.add(status);
+      }
+    });
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _selectedApplicability.clear();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final visiblePrecedents = _visiblePrecedents;
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: CustomAppBar(
         title: 'Resultados',
-        onBack: onBack,
+        onBack: widget.onBack,
         showSettings: false,
       ),
       body: SingleChildScrollView(
@@ -39,14 +101,105 @@ class ResultsPage extends StatelessWidget {
             ),
             const SizedBox(height: 18),
 
-            ...precedents.map((precedent) {
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Filtro de aplicabilidade',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1E1E2C),
+                          ),
+                        ),
+                      ),
+                      if (_selectedApplicability.isNotEmpty)
+                        TextButton(
+                          onPressed: _clearFilters,
+                          child: const Text('Limpar'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _selectedApplicability.isEmpty
+                        ? 'Nenhum filtro ativo. Todos os precedentes estão visíveis.'
+                        : 'Filtro(s) ativo(s): ${_selectedApplicability.length}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 12),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _applicabilityOptions.map((option) {
+                      final selected = _selectedApplicability.contains(
+                        option.status,
+                      );
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 40,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _toggleFilter(option.status),
+                              borderRadius: BorderRadius.circular(24),
+                              child: Ink(
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? option.color.withOpacity(0.14)
+                                      : Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: selected
+                                        ? option.color
+                                        : Colors.grey[300]!,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    option.label,
+                                    style: TextStyle(
+                                      color: selected
+                                          ? option.color
+                                          : const Color(0xFF334155),
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+
+            ...visiblePrecedents.map((precedent) {
               return _PrecedentCard(
                 precedent: precedent,
                 onTap: () => showPrecedentSheet(context, precedent),
               );
             }).toList(),
 
-            if (precedents.isEmpty)
+            if (visiblePrecedents.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
@@ -56,7 +209,9 @@ class ResultsPage extends StatelessWidget {
                   border: Border.all(color: Colors.grey[200]!),
                 ),
                 child: Text(
-                  'Nenhum precedente encontrado para este arquivo.',
+                  _selectedApplicability.isEmpty
+                      ? 'Nenhum precedente encontrado para este arquivo.'
+                      : 'Nenhum precedente encontrado para o filtro selecionado.',
                   style: TextStyle(color: Colors.grey[600]),
                 ),
               ),
@@ -65,6 +220,18 @@ class ResultsPage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ApplicabilityFilterOption {
+  final String status;
+  final String label;
+  final Color color;
+
+  const _ApplicabilityFilterOption({
+    required this.status,
+    required this.label,
+    required this.color,
+  });
 }
 
 class _PrecedentCard extends StatelessWidget {
