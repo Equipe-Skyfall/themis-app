@@ -126,7 +126,10 @@ class _PrecedentSheetUI extends StatelessWidget {
             ),
             const SizedBox(height: 14),
 
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(
                   _displayValue(precedent.tribunal),
@@ -136,11 +139,15 @@ class _PrecedentSheetUI extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: 8),
                 _buildBadge(
                   label: _getStatusLabel(precedent.status),
                   textColor: _getStatusColor(precedent.status),
                   background: _getStatusBackground(precedent.status),
+                ),
+                _buildBadge(
+                    label: precedent.situacao,
+                  textColor: const Color(0xFF1E5EFF),
+                  background: const Color(0xFF1E5EFF).withOpacity(0.12),
                 ),
               ],
             ),
@@ -182,11 +189,28 @@ class _PrecedentSheetUI extends StatelessWidget {
               _displayValue(precedent.theme),
               labelColor: const Color(0xFF1E5EFF),
             ),
-            _buildField('Explicação', explanationText,               labelColor: const Color(0xFF1E5EFF),),
+            _buildField(
+              'Situação Jurídica',
+              _formatLegalStatus(precedent.legalStatus),
+              labelColor: const Color(0xFF1E5EFF),
+            ),
+            _buildField(
+              'Situação',
+              precedent.situacao,
+              labelColor: const Color(0xFF1E5EFF),
+            ),
+            _buildField(
+              'Explicação',
+              explanationText,
+              labelColor: const Color(0xFF1E5EFF),
+            ),
             if (shouldShowEnunciado) _buildField('Enunciado', enunciadoText),
-            
-            _buildField('Tese Firmada', _displayValue(precedent.thesis),labelColor: const Color(0xFF1E5EFF),
-),
+
+            _buildField(
+              'Tese Firmada',
+              _displayValue(precedent.thesis),
+              labelColor: const Color(0xFF1E5EFF),
+            ),
 
             SizedBox(
               width: double.infinity,

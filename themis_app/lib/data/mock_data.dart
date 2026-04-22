@@ -47,6 +47,7 @@ final List<Precedent> mockPrecedents = [
     similarity: 94,
     status: "applicable",
     legalStatus: "Trânsito em Julgado",
+    situacao: "transito_em_julgado",
     theme:
         "Limitação de juros remuneratórios em contratos bancários de financiamento imobiliário",
     thesis:
@@ -64,6 +65,7 @@ final List<Precedent> mockPrecedents = [
     similarity: 87,
     status: "applicable",
     legalStatus: "Vigente",
+    situacao: "vigente",
     theme: "Revisão de taxas de juros abusivos em contratos bancários",
     thesis:
         "É possível a revisão das taxas de juros em contratos bancários quando demonstrada a abusividade, cabendo ao julgador fixar a taxa adequada.",
