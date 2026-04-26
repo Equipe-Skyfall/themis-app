@@ -33,7 +33,9 @@ class PetitionApiService {
                   '')
               .trim();
 
-  Future<List<Map<String, dynamic>>> analyzePetition({
+  /// Returns a map with keys `results` (List<Map<String, dynamic>>) and
+  /// `summary` (String?).
+  Future<Map<String, dynamic>> analyzePetition({
     required String token,
     required String fileName,
     required Uint8List pdfBytes,
@@ -78,10 +80,17 @@ class PetitionApiService {
       );
     }
 
-    return results
+    final resultsList = results
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
+
+    final summary = parsed?['summary'];
+
+    return {
+      'results': resultsList,
+      'summary': summary is String ? summary : null,
+    };
   }
 
   Uri _uri(String path) => Uri.parse('$_baseUrl$path');

@@ -6,12 +6,14 @@ import '../../lib/models.dart';
 class ResultsPage extends StatefulWidget {
   final CaseHistory case_;
   final List<Precedent> precedents;
+  final String? summary;
   final VoidCallback onBack;
 
   const ResultsPage({
     super.key,
     required this.case_,
     required this.precedents,
+    this.summary,
     required this.onBack,
   });
 
@@ -91,6 +93,87 @@ class _ResultsPageState extends State<ResultsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text(
+              'Resultados',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E1E2C),
+              ),
+            ),
+            Text(
+              'Resultado de arquivos',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // ── RESUMO DO CASO ──
+            if (widget.summary != null && widget.summary!.trim().isNotEmpty)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        width: 5,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF1D2A7A),
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(12),
+                            bottomLeft: Radius.circular(12),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'RESUMO DO CASO',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1D2A7A),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                widget.summary!,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF3A3A4A),
+                                  height: 1.55,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             const Text(
               'Precedentes Encontrados',
               style: TextStyle(

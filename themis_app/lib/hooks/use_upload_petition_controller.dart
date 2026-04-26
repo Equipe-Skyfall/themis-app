@@ -4,12 +4,19 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import '../data/petition/petition_api_service.dart';
 import '../lib/models.dart';
 
+class AnalysisResult {
+  final List<Precedent> precedents;
+  final String? summary;
+
+  const AnalysisResult({required this.precedents, this.summary});
+}
+
 class UploadPetitionController {
   final PlatformFile? selectedFile;
   final bool isSubmitting;
   final String? errorMessage;
   final Future<void> Function() pickPDF;
-  final Future<List<Precedent>?> Function({required int limit})
+  final Future<AnalysisResult?> Function({required int limit})
   generateAnalysis;
 
   const UploadPetitionController({
@@ -48,7 +55,7 @@ UploadPetitionController useUploadPetitionController({
     errorMessage.value = null;
   }
 
-  Future<List<Precedent>?> generateAnalysis({required int limit}) async {
+  Future<AnalysisResult?> generateAnalysis({required int limit}) async {
     if (token == null || token.isEmpty) {
       errorMessage.value = 'Sessao expirada. Faca login novamente.';
       return null;
@@ -76,14 +83,20 @@ UploadPetitionController useUploadPetitionController({
     errorMessage.value = null;
 
     try {
-      final rawResults = await petitionService.analyzePetition(
+      final response = await petitionService.analyzePetition(
         token: token,
         fileName: currentFile.name,
         pdfBytes: bytes,
         candidates: limit,
       );
 
-      return rawResults.map(_toPrecedent).toList();
+      final rawResults = response['results'] as List<Map<String, dynamic>>;
+      final summary = response['summary'] as String?;
+
+      return AnalysisResult(
+        precedents: rawResults.map(_toPrecedent).toList(),
+        summary: summary,
+      );
     } on PetitionApiException catch (e) {
       errorMessage.value = e.message;
       return null;
