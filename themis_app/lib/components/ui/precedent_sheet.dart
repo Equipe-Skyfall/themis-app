@@ -186,11 +186,7 @@ class _PrecedentSheetUI extends StatelessWidget {
               _displayValue(precedent.theme),
               labelColor: const Color(0xFF1E5EFF),
             ),
-            _buildField(
-              'Situação Jurídica',
-              _formatLegalStatus(precedent.legalStatus),
-              labelColor: const Color(0xFF1E5EFF),
-            ),
+
             _buildField(
               'Situação',
               precedent.situacao,

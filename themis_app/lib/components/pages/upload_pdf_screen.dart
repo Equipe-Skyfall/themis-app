@@ -10,7 +10,7 @@ import '../ui/app_bar.dart';
 class UploadScreen extends HookWidget {
   final String? token;
   final VoidCallback? onBack;
-  final void Function(String caseTitle, List<Precedent> precedents)?
+  final void Function(String caseTitle, List<Precedent> precedents, String? summary)?
   onAnalysisReady;
 
   const UploadScreen({
@@ -65,10 +65,10 @@ class UploadScreen extends HookWidget {
       limitError.value = null;
       isLoadingScreenVisible.value = true;
 
-      final precedents = await upload.generateAnalysis(limit: parsedLimit);
+      final result = await upload.generateAnalysis(limit: parsedLimit);
       isLoadingScreenVisible.value = false;
 
-      if (precedents == null) {
+      if (result == null) {
         if (upload.errorMessage != null && context.mounted) {
           ScaffoldMessenger.of(
             context,
@@ -77,10 +77,12 @@ class UploadScreen extends HookWidget {
         return;
       }
 
+      final precedents = result.precedents;
+
       if (precedents.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Nenhum precedente eFEncontrado.')),
+            const SnackBar(content: Text('Nenhum precedente encontrado.')),
           );
         }
         return;
@@ -88,7 +90,7 @@ class UploadScreen extends HookWidget {
 
       final fileName = upload.selectedFile?.name ?? 'Peticao';
       final limitedPrecedents = precedents.take(parsedLimit).toList();
-      onAnalysisReady?.call('Analise - $fileName', limitedPrecedents);
+      onAnalysisReady?.call('Analise - $fileName', limitedPrecedents, result.summary);
     }
 
     if (isLoadingScreenVisible.value) {

@@ -47,6 +47,7 @@ class AppController extends HookWidget {
     final isInUpload = useState(false);
     final selectedCase = useState<CaseHistory?>(null);
     final selectedPrecedents = useState<List<Precedent>?>(null);
+    final selectedSummary = useState<String?>(null);
 
     if (auth.session == null) {
       return AuthPage(onLogin: auth.login, onRegister: auth.register);
@@ -72,7 +73,7 @@ class AppController extends HookWidget {
         onBack: () {
           isInUpload.value = false;
         },
-        onAnalysisReady: (caseTitle, precedents) {
+        onAnalysisReady: (caseTitle, precedents, summary) {
           final now = DateTime.now();
           selectedCase.value = CaseHistory(
             id: 'analysis_${now.millisecondsSinceEpoch}',
@@ -82,6 +83,7 @@ class AppController extends HookWidget {
             matchCount: precedents.length,
           );
           selectedPrecedents.value = precedents;
+          selectedSummary.value = summary;
           isInUpload.value = false;
         },
       );
@@ -92,9 +94,11 @@ class AppController extends HookWidget {
       return ResultsPage(
         case_: selectedCase.value!,
         precedents: precedentsForCase,
+        summary: selectedSummary.value,
         onBack: () {
           selectedCase.value = null;
           selectedPrecedents.value = null;
+          selectedSummary.value = null;
         },
       );
     }
