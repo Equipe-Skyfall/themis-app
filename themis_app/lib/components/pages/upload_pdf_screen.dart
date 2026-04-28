@@ -10,7 +10,7 @@ import '../ui/app_bar.dart';
 class UploadScreen extends HookWidget {
   final String? token;
   final VoidCallback? onBack;
-  final void Function(String caseTitle, List<Precedent> precedents)?
+  final void Function(String caseTitle, List<Precedent> precedents, String? summary)?
   onAnalysisReady;
 
   const UploadScreen({
@@ -24,10 +24,14 @@ class UploadScreen extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final upload = useUploadPetitionController(token: token);
     final hasFile = upload.selectedFile != null;
     final isLoadingScreenVisible = useState(false);
     final loadingStep = useState(0);
+    final resultsLimit = useState(10);
+    final limitController = useTextEditingController(text: '10');
+    final limitError = useState<String?>(null);
 
     useEffect(() {
       if (!isLoadingScreenVisible.value) {
@@ -45,12 +49,26 @@ class UploadScreen extends HookWidget {
     }, [isLoadingScreenVisible.value]);
 
     Future<void> onGeneratePressed() async {
+      final parsedLimit = int.tryParse(limitController.text.trim());
+      if (parsedLimit == null || parsedLimit <= 0) {
+        limitError.value = 'Informe um numero inteiro maior que zero.';
+        return;
+      }
+
+      if (parsedLimit > 20) {
+        limitError.value =
+            'Para manter a performance, use no maximo 20 resultados.';
+        return;
+      }
+
+      resultsLimit.value = parsedLimit;
+      limitError.value = null;
       isLoadingScreenVisible.value = true;
 
-      final precedents = await upload.generateAnalysis();
+      final result = await upload.generateAnalysis(limit: parsedLimit);
       isLoadingScreenVisible.value = false;
 
-      if (precedents == null) {
+      if (result == null) {
         if (upload.errorMessage != null && context.mounted) {
           ScaffoldMessenger.of(
             context,
@@ -58,6 +76,8 @@ class UploadScreen extends HookWidget {
         }
         return;
       }
+
+      final precedents = result.precedents;
 
       if (precedents.isEmpty) {
         if (context.mounted) {
@@ -69,7 +89,8 @@ class UploadScreen extends HookWidget {
       }
 
       final fileName = upload.selectedFile?.name ?? 'Peticao';
-      onAnalysisReady?.call('Analise - $fileName', precedents);
+      final limitedPrecedents = precedents.take(parsedLimit).toList();
+      onAnalysisReady?.call('Analise - $fileName', limitedPrecedents, result.summary);
     }
 
     if (isLoadingScreenVisible.value) {
@@ -100,6 +121,147 @@ class UploadScreen extends HookWidget {
               style: TextStyle(color: Colors.grey),
             ),
             const SizedBox(height: 20),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: colorScheme.outlineVariant),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.filter_list_rounded,
+                          size: 18,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Quantidade de precedentes',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: Color(0xFF1E1E2C),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Escolha um valor rápido ou digite manualmente.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [5, 10, 20].map((option) {
+                      final selected = resultsLimit.value == option;
+                      return ChoiceChip(
+                        label: Text(
+                          '$option',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF374151),
+                          ),
+                        ),
+                        selected: selected,
+                        onSelected: (_) {
+                          resultsLimit.value = option;
+                          limitController.text = option.toString();
+                          limitError.value = null;
+                        },
+                        backgroundColor: Colors.grey.shade100,
+                        selectedColor: const Color(0xFF1E1E2C),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide(color: colorScheme.outlineVariant),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: limitController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Quantidade de precedentes',
+                      hintText: 'Ex.: 15',
+                      prefixIcon: const Icon(Icons.numbers_rounded),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: colorScheme.outlineVariant,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: colorScheme.outlineVariant,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF1E1E2C)),
+                      ),
+                      errorText: limitError.value,
+                    ),
+                    onChanged: (_) {
+                      if (limitError.value != null) {
+                        limitError.value = null;
+                      }
+                    },
+                    onSubmitted: (value) {
+                      final parsed = int.tryParse(value.trim());
+                      if (parsed != null && parsed > 0 && parsed <= 100) {
+                        resultsLimit.value = parsed;
+                        limitError.value = null;
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
 
             GestureDetector(
               onTap: upload.pickPDF,

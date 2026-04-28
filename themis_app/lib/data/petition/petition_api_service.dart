@@ -33,15 +33,23 @@ class PetitionApiService {
                   '')
               .trim();
 
-  Future<List<Map<String, dynamic>>> analyzePetition({
+  /// Returns a map with keys `results` (List<Map<String, dynamic>>) and
+  /// `summary` (String?).
+  Future<Map<String, dynamic>> analyzePetition({
     required String token,
     required String fileName,
     required Uint8List pdfBytes,
+    required int candidates,
   }) async {
     _assertConfigured();
 
+    if (candidates <= 0) {
+      throw const PetitionApiException('Quantidade de precedentes invalida.');
+    }
+
     final request = http.MultipartRequest('POST', _uri('/petition/analyze'));
     request.headers['Authorization'] = 'Bearer $token';
+    request.fields['candidates'] = candidates.toString();
     request.files.add(
       http.MultipartFile.fromBytes(
         'file',
@@ -72,10 +80,17 @@ class PetitionApiService {
       );
     }
 
-    return results
+    final resultsList = results
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
+
+    final summary = parsed?['summary'];
+
+    return {
+      'results': resultsList,
+      'summary': summary is String ? summary : null,
+    };
   }
 
   Uri _uri(String path) => Uri.parse('$_baseUrl$path');

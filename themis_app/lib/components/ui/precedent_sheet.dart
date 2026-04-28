@@ -1,4 +1,3 @@
-// themis_app/lib/components/precedent_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:themis_app/lib/models.dart';
 
@@ -64,10 +63,9 @@ class _PrecedentSheetUI extends StatelessWidget {
       '\n',
     );
 
-    // Remove outras tags HTML eventualmente vindas do backend.
+
     text = text.replaceAll(RegExp(r'<[^>]*>'), '');
 
-    // Decodifica entidades HTML comuns.
     text = text
         .replaceAll('&nbsp;', ' ')
         .replaceAll('&amp;', '&')
@@ -76,7 +74,6 @@ class _PrecedentSheetUI extends StatelessWidget {
         .replaceAll('&quot;', '"')
         .replaceAll('&#39;', "'");
 
-    // Limpa espaços extras por linha e reduz múltiplas linhas vazias.
     final lines = text
         .split('\n')
         .map((line) => line.trim())
@@ -126,7 +123,10 @@ class _PrecedentSheetUI extends StatelessWidget {
             ),
             const SizedBox(height: 14),
 
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text(
                   _displayValue(precedent.tribunal),
@@ -136,11 +136,15 @@ class _PrecedentSheetUI extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: 8),
                 _buildBadge(
                   label: _getStatusLabel(precedent.status),
                   textColor: _getStatusColor(precedent.status),
                   background: _getStatusBackground(precedent.status),
+                ),
+                _buildBadge(
+                    label: precedent.situacao,
+                  textColor: const Color(0xFF1E5EFF),
+                  background: const Color(0xFF1E5EFF).withOpacity(0.12),
                 ),
               ],
             ),
@@ -177,11 +181,29 @@ class _PrecedentSheetUI extends StatelessWidget {
             ),
             const SizedBox(height: 18),
 
-            _buildField('Tema', _displayValue(precedent.theme)),
-            _buildField('Status', _formatLegalStatus(precedent.legalStatus)),
-            _buildField('Explicacao', explanationText),
+            _buildField(
+              'Tema do Precedente',
+              _displayValue(precedent.theme),
+              labelColor: const Color(0xFF1E5EFF),
+            ),
+
+            _buildField(
+              'Situação',
+              precedent.situacao,
+              labelColor: const Color(0xFF1E5EFF),
+            ),
+            _buildField(
+              'Explicação',
+              explanationText,
+              labelColor: const Color(0xFF1E5EFF),
+            ),
             if (shouldShowEnunciado) _buildField('Enunciado', enunciadoText),
-            _buildField('Tese Firmada', _displayValue(precedent.thesis)),
+
+            _buildField(
+              'Tese Firmada',
+              _displayValue(precedent.thesis),
+              labelColor: const Color(0xFF1E5EFF),
+            ),
 
             SizedBox(
               width: double.infinity,
@@ -207,7 +229,7 @@ class _PrecedentSheetUI extends StatelessWidget {
     );
   }
 
-  Widget _buildField(String label, String value) {
+  Widget _buildField(String label, String value, {Color? labelColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -218,7 +240,7 @@ class _PrecedentSheetUI extends StatelessWidget {
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
-              color: Colors.grey[700],
+              color: labelColor ?? Colors.grey[700],
             ),
           ),
           const SizedBox(height: 4),

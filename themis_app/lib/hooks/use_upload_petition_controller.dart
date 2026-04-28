@@ -4,12 +4,20 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import '../data/petition/petition_api_service.dart';
 import '../lib/models.dart';
 
+class AnalysisResult {
+  final List<Precedent> precedents;
+  final String? summary;
+
+  const AnalysisResult({required this.precedents, this.summary});
+}
+
 class UploadPetitionController {
   final PlatformFile? selectedFile;
   final bool isSubmitting;
   final String? errorMessage;
   final Future<void> Function() pickPDF;
-  final Future<List<Precedent>?> Function() generateAnalysis;
+  final Future<AnalysisResult?> Function({required int limit})
+  generateAnalysis;
 
   const UploadPetitionController({
     required this.selectedFile,
@@ -47,9 +55,14 @@ UploadPetitionController useUploadPetitionController({
     errorMessage.value = null;
   }
 
-  Future<List<Precedent>?> generateAnalysis() async {
+  Future<AnalysisResult?> generateAnalysis({required int limit}) async {
     if (token == null || token.isEmpty) {
       errorMessage.value = 'Sessao expirada. Faca login novamente.';
+      return null;
+    }
+
+    if (limit <= 0) {
+      errorMessage.value = 'Quantidade de precedentes invalida.';
       return null;
     }
 
@@ -70,13 +83,20 @@ UploadPetitionController useUploadPetitionController({
     errorMessage.value = null;
 
     try {
-      final rawResults = await petitionService.analyzePetition(
+      final response = await petitionService.analyzePetition(
         token: token,
         fileName: currentFile.name,
         pdfBytes: bytes,
+        candidates: limit,
       );
 
-      return rawResults.map(_toPrecedent).toList();
+      final rawResults = response['results'] as List<Map<String, dynamic>>;
+      final summary = response['summary'] as String?;
+
+      return AnalysisResult(
+        precedents: rawResults.map(_toPrecedent).toList(),
+        summary: summary,
+      );
     } on PetitionApiException catch (e) {
       errorMessage.value = e.message;
       return null;
@@ -111,6 +131,7 @@ Precedent _toPrecedent(Map<String, dynamic> item) {
   final enunciado =
       _pickFirstText(item, ['textoEmenta', 'textoDecisao']) ?? explanation;
   final tese = (item['tese'] ?? '').toString().trim();
+  final situacao = _mapSituacao((item['situacao'] ?? '').toString());
 
   return Precedent(
     id: rawId,
@@ -119,11 +140,26 @@ Precedent _toPrecedent(Map<String, dynamic> item) {
     similarity: _toDouble(item['similarity_score']),
     status: status,
     legalStatus: (item['relevance_label'] ?? '').toString(),
+    situacao: situacao,
     theme: (item['questao'] ?? 'Tema nao informado').toString(),
     thesis: tese.isNotEmpty ? tese : explanation,
     summary: enunciado.isNotEmpty ? enunciado : 'Nao informado',
     whyApplies: explanation.isNotEmpty ? explanation : 'Nao informado',
   );
+}
+
+String _mapSituacao(String raw) {
+  final value = raw.trim();
+  if (value.isEmpty) {
+    return value;
+  }
+
+  final normalized = _normalizeLabel(value);
+  if (normalized == 'admitido_possivel_revisao_tese') {
+    return 'Admitido (possível revisão de tese)';
+  }
+
+  return value;
 }
 
 String _normalizeLabel(String raw) {

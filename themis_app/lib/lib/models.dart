@@ -23,6 +23,7 @@ class Precedent {
   final double similarity;
   final String status;
   final String legalStatus;
+  final String situacao;
   final String theme;
   final String thesis;
   final String summary;
@@ -35,6 +36,7 @@ class Precedent {
     required this.similarity,
     required this.status,
     required this.legalStatus,
+    required this.situacao,
     required this.theme,
     required this.thesis,
     required this.summary,
