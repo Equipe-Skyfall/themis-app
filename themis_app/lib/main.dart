@@ -10,7 +10,6 @@ import 'components/pages/settings_page.dart';
 import 'components/pages/results_page.dart';
 import 'components/pages/upload_pdf_screen.dart';
 import 'lib/models.dart';
-import 'data/mock_data.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -90,10 +89,9 @@ class AppController extends HookWidget {
     }
 
     if (selectedCase.value != null) {
-      final precedentsForCase = selectedPrecedents.value ?? mockPrecedents;
       return ResultsPage(
         case_: selectedCase.value!,
-        precedents: precedentsForCase,
+        precedents: selectedPrecedents.value ?? [],
         summary: selectedSummary.value,
         onBack: () {
           selectedCase.value = null;
@@ -105,6 +103,7 @@ class AppController extends HookWidget {
 
     return DashboardPage(
       userName: auth.session?.user.username,
+      token: auth.session?.token,
       onLogout: () {
         auth.logout();
       },
@@ -114,19 +113,16 @@ class AppController extends HookWidget {
       onNewAnalysis: () {
         isInUpload.value = true;
       },
-      onSelectCase: (caseItem) {
-        if (caseItem.status == 'completed') {
-          selectedCase.value = caseItem;
-          selectedPrecedents.value = mockPrecedents;
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Apenas análises concluídas podem ser visualizadas',
-              ),
-            ),
-          );
-        }
+      onSelectHistory: (entry) {
+        selectedCase.value = CaseHistory(
+          id: entry.id,
+          title: entry.filename,
+          date: '${entry.timestamp.day}/${entry.timestamp.month}/${entry.timestamp.year}',
+          status: 'completed',
+          matchCount: entry.precedents.length,
+        );
+        selectedPrecedents.value = entry.precedents;
+        selectedSummary.value = entry.summary;
       },
     );
   }

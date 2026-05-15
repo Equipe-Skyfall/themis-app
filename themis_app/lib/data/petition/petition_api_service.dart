@@ -93,6 +93,38 @@ class PetitionApiService {
     };
   }
 
+  /// Fetches the petition analysis history for the authenticated user.
+  /// Returns a list of raw history entry maps.
+  Future<List<Map<String, dynamic>>> fetchHistory({
+    required String token,
+  }) async {
+    _assertConfigured();
+
+    final response = await _httpClient.get(
+      _uri('/petition/history'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+
+    if (!_isSuccess(response.statusCode)) {
+      throw PetitionApiException(
+        _errorMessage(response),
+        statusCode: response.statusCode,
+        responseBody: response.body,
+      );
+    }
+
+    final parsed = _decodeBody(response.body);
+    final history = parsed?['history'];
+    if (history is! List) {
+      return [];
+    }
+
+    return history
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
   Uri _uri(String path) => Uri.parse('$_baseUrl$path');
 
   void _assertConfigured() {
