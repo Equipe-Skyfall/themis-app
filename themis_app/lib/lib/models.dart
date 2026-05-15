@@ -43,3 +43,19 @@ class Precedent {
     required this.whyApplies,
   });
 }
+
+class HistoryEntry {
+  final String id;
+  final String filename;
+  final DateTime timestamp;
+  final String? summary;
+  final List<Precedent> precedents;
+
+  HistoryEntry({
+    required this.id,
+    required this.filename,
+    required this.timestamp,
+    this.summary,
+    required this.precedents,
+  });
+}

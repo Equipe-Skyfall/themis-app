@@ -94,7 +94,7 @@ UploadPetitionController useUploadPetitionController({
       final summary = response['summary'] as String?;
 
       return AnalysisResult(
-        precedents: rawResults.map(_toPrecedent).toList(),
+        precedents: rawResults.map(toPrecedent).toList(),
         summary: summary,
       );
     } on PetitionApiException catch (e) {
@@ -117,7 +117,7 @@ UploadPetitionController useUploadPetitionController({
   );
 }
 
-Precedent _toPrecedent(Map<String, dynamic> item) {
+Precedent toPrecedent(Map<String, dynamic> item) {
   final relevance = _normalizeLabel((item['relevance_label'] ?? '').toString());
   final status = switch (relevance) {
     'aplicavel' => 'applicable',
