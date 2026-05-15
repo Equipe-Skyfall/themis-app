@@ -79,6 +79,68 @@ class _ResultsPageState extends State<ResultsPage> {
     });
   }
 
+  bool _hasOnlyWeakPrecedents() {
+    if (widget.precedents.isEmpty) {
+      return false;
+    }
+    return !widget.precedents.any((p) => 
+      _normalizeStatus(p.status) == 'applicable'
+    );
+  }
+
+  Widget _buildWeakPrecedentsAlert() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFE082)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFFF9A825),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Atenção: Sem precedentes fortes',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFE65100),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Nenhum precedente com alta relevância foi encontrado. '
+                  'Os resultados abaixo podem ter baixa similaridade. '
+                  'Recomendamos revisar com cautela.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[700],
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _exportToPdf() async {
     setState(() {
       _isExporting = true;
@@ -358,6 +420,10 @@ class _ResultsPageState extends State<ResultsPage> {
                 ],
               ),
             ),
+
+            // ── ALERTA DE PRECEDENTES FRACOS ──
+            if (_hasOnlyWeakPrecedents() && _selectedApplicability.isEmpty)
+              _buildWeakPrecedentsAlert(),
 
             ...visiblePrecedents.map((precedent) {
               return _PrecedentCard(
