@@ -19,6 +19,10 @@ cd themis_app
 ```
 
 ```
+flutter pub get
+```
+
+```
 flutter run -d windows
 ```
 
