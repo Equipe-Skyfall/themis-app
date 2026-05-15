@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../../hooks/use_upload_petition_controller.dart';
@@ -10,7 +11,11 @@ import '../ui/app_bar.dart';
 class UploadScreen extends HookWidget {
   final String? token;
   final VoidCallback? onBack;
-  final void Function(String caseTitle, List<Precedent> precedents, String? summary)?
+  final void Function(
+    String caseTitle,
+    List<Precedent> precedents,
+    String? summary,
+  )?
   onAnalysisReady;
 
   const UploadScreen({
@@ -51,13 +56,12 @@ class UploadScreen extends HookWidget {
     Future<void> onGeneratePressed() async {
       final parsedLimit = int.tryParse(limitController.text.trim());
       if (parsedLimit == null || parsedLimit <= 0) {
-        limitError.value = 'Informe um numero inteiro maior que zero.';
+        limitError.value = 'Digite um número maior que 0.';
         return;
       }
 
       if (parsedLimit > 20) {
-        limitError.value =
-            'Para manter a performance, use no maximo 20 resultados.';
+        limitError.value = 'Use no máximo 20 precedentes.';
         return;
       }
 
@@ -90,7 +94,11 @@ class UploadScreen extends HookWidget {
 
       final fileName = upload.selectedFile?.name ?? 'Peticao';
       final limitedPrecedents = precedents.take(parsedLimit).toList();
-      onAnalysisReady?.call('Analise - $fileName', limitedPrecedents, result.summary);
+      onAnalysisReady?.call(
+        'Analise - $fileName',
+        limitedPrecedents,
+        result.summary,
+      );
     }
 
     if (isLoadingScreenVisible.value) {
@@ -216,7 +224,10 @@ class UploadScreen extends HookWidget {
                   const SizedBox(height: 12),
                   TextField(
                     controller: limitController,
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: false,
+                    ),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
                       labelText: 'Quantidade de precedentes',
                       hintText: 'Ex.: 15',
@@ -253,7 +264,7 @@ class UploadScreen extends HookWidget {
                     },
                     onSubmitted: (value) {
                       final parsed = int.tryParse(value.trim());
-                      if (parsed != null && parsed > 0 && parsed <= 100) {
+                      if (parsed != null && parsed > 0 && parsed <= 20) {
                         resultsLimit.value = parsed;
                         limitError.value = null;
                       }
