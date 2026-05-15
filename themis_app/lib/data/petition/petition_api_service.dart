@@ -35,15 +35,22 @@ class PetitionApiService {
                   '')
               .trim();
 
-  Future<String> _submitCaseAnalysis({
+  /// Returns a map with keys `results` (List<Map<String, dynamic>>) and
+  /// `summary` (String?).
+  Future<Map<String, dynamic>> analyzePetition({
     required String token,
     required String fileName,
     required Uint8List pdfBytes,
     required int candidates,
   }) async {
-    final request = http.MultipartRequest('POST', _uri('/petition/analyze-case-test'));
+    _assertConfigured();
+
+    if (candidates <= 0) {
+      throw const PetitionApiException('Quantidade de precedentes invalida.');
+    }
+
+    final request = http.MultipartRequest('POST', _uri('/petition/analyze'));
     request.headers['Authorization'] = 'Bearer $token';
-    request.fields['candidates'] = candidates.toString();
     request.files.add(
       http.MultipartFile.fromBytes(
         'file',
@@ -60,12 +67,12 @@ class PetitionApiService {
     }
 
     final streamedResponse = await _httpClient.send(request).timeout(
-      const Duration(seconds: 90),
+      const Duration(minutes: 5),
     );
     final response = await http.Response.fromStream(streamedResponse);
 
     if (kDebugMode) {
-      debugPrint('[API] Resposta submissão - Status: ${response.statusCode}');
+      debugPrint('[API] Resposta - Status: ${response.statusCode}');
       debugPrint('[API] Body: ${response.body}');
     }
 
@@ -78,144 +85,32 @@ class PetitionApiService {
     }
 
     final parsed = _decodeBody(response.body);
-    final jobId = parsed?['job_id'];
-    
-    if (kDebugMode) {
-      debugPrint('[API] Job ID recebido: $jobId');
-    }
-    
-    if (jobId is! String || jobId.isEmpty) {
+    if (parsed == null) {
       throw const PetitionApiException(
-        'Resposta da submissão em formato inesperado. Job ID não recebido.',
+        'Resposta da análise em formato inesperado.',
       );
     }
 
-    return jobId;
-  }
-
-  /// Polls the status of a case analysis.
-  /// Returns the full analysis result when complete.
-  Future<Map<String, dynamic>> _pollCaseStatus({
-    required String token,
-    required String jobId,
-    Duration timeout = const Duration(minutes: 5),
-    Duration pollInterval = const Duration(seconds: 5),
-  }) async {
-    final startTime = DateTime.now();
-
-    while (true) {
-      if (DateTime.now().difference(startTime) > timeout) {
-        throw const PetitionApiException(
-          'Análise expirou. Tempo limite excedido.',
-        );
-      }
-
-      try {
-        final response = await _httpClient.get(
-          _uri('/petition/case-status/$jobId'),
-          headers: {'Authorization': 'Bearer $token'},
-        ).timeout(const Duration(seconds: 30));
-
-        if (kDebugMode) {
-          debugPrint('[API] Polling status - Job: $jobId');
-          debugPrint('[API] Status code: ${response.statusCode}');
-        }
-
-        if (!_isSuccess(response.statusCode)) {
-          throw PetitionApiException(
-            _errorMessage(response),
-            statusCode: response.statusCode,
-            responseBody: response.body,
-          );
-        }
-
-        final parsed = _decodeBody(response.body);
-        final status = parsed?['status'];
-
-        if (kDebugMode) {
-          debugPrint('[API] Status da análise: $status');
-        }
-
-        // Check if analysis is complete
-        if (status == 'completed' || status == 'done') {
-          final result = parsed?['result'];
-          final precedentResults = result?['precedent_results'];
-          final caseSummary = result?['case_summary'];
-          
-          if (kDebugMode) {
-            debugPrint('[API] Análise completa. Resultados: ${precedentResults?.length ?? 0}');
-          }
-          
-          if (precedentResults is! List) {
-            throw const PetitionApiException(
-              'Nenhum precedente encontrado na base Pangea para este caso.',
-            );
-          }
-
-          if (precedentResults.isEmpty) {
-            throw const PetitionApiException(
-              'Nenhum precedente encontrado na base Pangea para este caso.',
-            );
-          }
-
-          final resultsList = precedentResults
-              .whereType<Map>()
-              .map((item) => Map<String, dynamic>.from(item))
-              .toList();
-
-          return {
-            'results': resultsList,
-            'summary': caseSummary is String ? caseSummary : null,
-          };
-        }
-
-        // Still processing, wait before next poll
-        if (kDebugMode) {
-          debugPrint('[API] Aguardando análise... (status: $status)');
-          debugPrint('[API] Próximo poll em ${pollInterval.inSeconds}s...');
-        }
-        await Future.delayed(pollInterval);
-      } catch (e) {
-        // If it's already our exception, rethrow
-        if (e is PetitionApiException) rethrow;
-        // Otherwise wrap it
-        if (kDebugMode) {
-          debugPrint('[API] Erro no polling: $e');
-        }
-        throw PetitionApiException(
-          'Erro ao verificar status da análise: $e',
-        );
-      }
-    }
-  }
-
-  /// Returns a map with keys `results` (List<Map<String, dynamic>>) and
-  /// `summary` (String?).
-  Future<Map<String, dynamic>> analyzePetition({
-    required String token,
-    required String fileName,
-    required Uint8List pdfBytes,
-    required int candidates,
-  }) async {
-    _assertConfigured();
-
-    if (candidates <= 0) {
-      throw const PetitionApiException('Quantidade de precedentes invalida.');
+    final results = parsed['results'];
+    if (results is! List || results.isEmpty) {
+      throw const PetitionApiException(
+        'Nenhum precedente encontrado na base Pangea para este caso.',
+      );
     }
 
-    // Submit case for analysis and get job ID
-    final jobId = await _submitCaseAnalysis(
-      token: token,
-      fileName: fileName,
-      pdfBytes: pdfBytes,
-      candidates: candidates,
-    );
+    final resultsList = results
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
 
-    // Poll for results
-    return await _pollCaseStatus(
-      token: token,
-      jobId: jobId,
-    );
+    if (kDebugMode) {
+      debugPrint('[API] Análise completa. Resultados: ${resultsList.length}');
+    }
+
+    return {
+      'results': resultsList,
+      'summary': parsed['summary'] is String ? parsed['summary'] : null,
+    };
   }
 
   /// Fetches the petition analysis history for the authenticated user.
