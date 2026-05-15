@@ -63,7 +63,6 @@ class _PrecedentSheetUI extends StatelessWidget {
       '\n',
     );
 
-
     text = text.replaceAll(RegExp(r'<[^>]*>'), '');
 
     text = text
@@ -85,9 +84,21 @@ class _PrecedentSheetUI extends StatelessWidget {
     return text.trim();
   }
 
+  String _capitalizeFirst(String s) {
+    if (s.isEmpty) return s;
+    var i = 0;
+    while (i < s.length && s[i].trim().isEmpty) {
+      i++;
+    }
+    if (i >= s.length) return s;
+    return s.substring(0, i) + s[i].toUpperCase() + s.substring(i + 1);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final explanationText = _displayValue(precedent.whyApplies);
+    final explanationText = _capitalizeFirst(
+      _displayValue(precedent.whyApplies),
+    );
     final enunciadoText = _displayValue(precedent.summary);
     final shouldShowEnunciado =
         enunciadoText.toLowerCase().trim() !=
@@ -142,7 +153,7 @@ class _PrecedentSheetUI extends StatelessWidget {
                   background: _getStatusBackground(precedent.status),
                 ),
                 _buildBadge(
-                    label: precedent.situacao,
+                  label: precedent.situacao,
                   textColor: const Color(0xFF1E5EFF),
                   background: const Color(0xFF1E5EFF).withOpacity(0.12),
                 ),
@@ -182,6 +193,12 @@ class _PrecedentSheetUI extends StatelessWidget {
             const SizedBox(height: 18),
 
             _buildField(
+              'Explicação',
+              explanationText,
+              labelColor: const Color(0xFF1E5EFF),
+            ),
+
+            _buildField(
               'Tema do Precedente',
               _displayValue(precedent.theme),
               labelColor: const Color(0xFF1E5EFF),
@@ -190,11 +207,6 @@ class _PrecedentSheetUI extends StatelessWidget {
             _buildField(
               'Situação',
               precedent.situacao,
-              labelColor: const Color(0xFF1E5EFF),
-            ),
-            _buildField(
-              'Explicação',
-              explanationText,
               labelColor: const Color(0xFF1E5EFF),
             ),
             if (shouldShowEnunciado) _buildField('Enunciado', enunciadoText),
