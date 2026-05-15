@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../ui/app_bar.dart';
 import '../ui/precedent_sheet.dart';
 import '../../lib/models.dart';
+import '../../services/pdf_export_service.dart';
 
 class ResultsPage extends StatefulWidget {
   final CaseHistory case_;
@@ -23,6 +24,7 @@ class ResultsPage extends StatefulWidget {
 
 class _ResultsPageState extends State<ResultsPage> {
   final Set<String> _selectedApplicability = <String>{};
+  bool _isExporting = false;
 
   static const List<_ApplicabilityFilterOption> _applicabilityOptions = [
     _ApplicabilityFilterOption(
@@ -75,6 +77,46 @@ class _ResultsPageState extends State<ResultsPage> {
     setState(() {
       _selectedApplicability.clear();
     });
+  }
+
+  Future<void> _exportToPdf() async {
+    setState(() {
+      _isExporting = true;
+    });
+
+    try {
+      final filePath = await PDFExportService.exportPrecedentsToPdf(
+        _visiblePrecedents,
+        widget.case_,
+        widget.summary,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF salvo em: $filePath'),
+            backgroundColor: const Color(0xFF4CAF50),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao exportar PDF: $e'),
+            backgroundColor: const Color(0xFFD94841),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
   }
 
   @override
@@ -270,6 +312,48 @@ class _ResultsPageState extends State<ResultsPage> {
                         ),
                       );
                     }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: _isExporting ? null : _exportToPdf,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1D2A7A),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFF1D2A7A).withOpacity(0.6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: _isExporting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.download_rounded, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Exportar para PDF',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
                   ),
                 ],
               ),
