@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -34,15 +35,13 @@ class PetitionApiService {
                   '')
               .trim();
 
-  /// Submits a case for analysis and returns a job ID.
-  /// Used internally by [analyzePetition].
   Future<String> _submitCaseAnalysis({
     required String token,
     required String fileName,
     required Uint8List pdfBytes,
     required int candidates,
   }) async {
-    final request = http.MultipartRequest('POST', _uri('/analyze-case-test'));
+    final request = http.MultipartRequest('POST', _uri('/petition/analyze-case-test'));
     request.headers['Authorization'] = 'Bearer $token';
     request.fields['candidates'] = candidates.toString();
     request.files.add(
@@ -54,10 +53,21 @@ class PetitionApiService {
       ),
     );
 
+    if (kDebugMode) {
+      debugPrint('[API] Enviando PDF para análise');
+      debugPrint('[API] URL: ${request.url}');
+      debugPrint('[API] Arquivo: $fileName (${pdfBytes.length} bytes)');
+    }
+
     final streamedResponse = await _httpClient.send(request).timeout(
       const Duration(seconds: 90),
     );
     final response = await http.Response.fromStream(streamedResponse);
+
+    if (kDebugMode) {
+      debugPrint('[API] Resposta submissão - Status: ${response.statusCode}');
+      debugPrint('[API] Body: ${response.body}');
+    }
 
     if (!_isSuccess(response.statusCode)) {
       throw PetitionApiException(
@@ -69,6 +79,11 @@ class PetitionApiService {
 
     final parsed = _decodeBody(response.body);
     final jobId = parsed?['job_id'];
+    
+    if (kDebugMode) {
+      debugPrint('[API] Job ID recebido: $jobId');
+    }
+    
     if (jobId is! String || jobId.isEmpty) {
       throw const PetitionApiException(
         'Resposta da submissão em formato inesperado. Job ID não recebido.',
@@ -84,7 +99,7 @@ class PetitionApiService {
     required String token,
     required String jobId,
     Duration timeout = const Duration(minutes: 5),
-    Duration pollInterval = const Duration(seconds: 2),
+    Duration pollInterval = const Duration(seconds: 5),
   }) async {
     final startTime = DateTime.now();
 
@@ -97,9 +112,14 @@ class PetitionApiService {
 
       try {
         final response = await _httpClient.get(
-          _uri('/case-status/$jobId'),
+          _uri('/petition/case-status/$jobId'),
           headers: {'Authorization': 'Bearer $token'},
         ).timeout(const Duration(seconds: 30));
+
+        if (kDebugMode) {
+          debugPrint('[API] Polling status - Job: $jobId');
+          debugPrint('[API] Status code: ${response.statusCode}');
+        }
 
         if (!_isSuccess(response.statusCode)) {
           throw PetitionApiException(
@@ -112,34 +132,56 @@ class PetitionApiService {
         final parsed = _decodeBody(response.body);
         final status = parsed?['status'];
 
+        if (kDebugMode) {
+          debugPrint('[API] Status da análise: $status');
+        }
+
         // Check if analysis is complete
         if (status == 'completed' || status == 'done') {
-          final results = parsed?['results'];
-          if (results is! List) {
+          final result = parsed?['result'];
+          final precedentResults = result?['precedent_results'];
+          final caseSummary = result?['case_summary'];
+          
+          if (kDebugMode) {
+            debugPrint('[API] Análise completa. Resultados: ${precedentResults?.length ?? 0}');
+          }
+          
+          if (precedentResults is! List) {
             throw const PetitionApiException(
-              'Resposta da análise em formato inesperado.',
+              'Nenhum precedente encontrado na base Pangea para este caso.',
             );
           }
 
-          final resultsList = results
+          if (precedentResults.isEmpty) {
+            throw const PetitionApiException(
+              'Nenhum precedente encontrado na base Pangea para este caso.',
+            );
+          }
+
+          final resultsList = precedentResults
               .whereType<Map>()
               .map((item) => Map<String, dynamic>.from(item))
               .toList();
 
-          final summary = parsed?['summary'];
-
           return {
             'results': resultsList,
-            'summary': summary is String ? summary : null,
+            'summary': caseSummary is String ? caseSummary : null,
           };
         }
 
         // Still processing, wait before next poll
+        if (kDebugMode) {
+          debugPrint('[API] Aguardando análise... (status: $status)');
+          debugPrint('[API] Próximo poll em ${pollInterval.inSeconds}s...');
+        }
         await Future.delayed(pollInterval);
       } catch (e) {
         // If it's already our exception, rethrow
         if (e is PetitionApiException) rethrow;
         // Otherwise wrap it
+        if (kDebugMode) {
+          debugPrint('[API] Erro no polling: $e');
+        }
         throw PetitionApiException(
           'Erro ao verificar status da análise: $e',
         );
@@ -228,6 +270,10 @@ class PetitionApiService {
 
     if (response.statusCode == 401) {
       return 'Sessao expirada. Faca login novamente.';
+    }
+
+    if (response.statusCode == 404) {
+      return 'Nenhum precedente encontrado na base Pangea para este caso.';
     }
 
     if (response.statusCode == 400) {
