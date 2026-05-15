@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -33,6 +34,119 @@ class PetitionApiService {
                   '')
               .trim();
 
+  /// Submits a case for analysis and returns a job ID.
+  /// Used internally by [analyzePetition].
+  Future<String> _submitCaseAnalysis({
+    required String token,
+    required String fileName,
+    required Uint8List pdfBytes,
+    required int candidates,
+  }) async {
+    final request = http.MultipartRequest('POST', _uri('/analyze-case-test'));
+    request.headers['Authorization'] = 'Bearer $token';
+    request.fields['candidates'] = candidates.toString();
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        pdfBytes,
+        filename: fileName,
+        contentType: MediaType('application', 'pdf'),
+      ),
+    );
+
+    final streamedResponse = await _httpClient.send(request).timeout(
+      const Duration(seconds: 90),
+    );
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (!_isSuccess(response.statusCode)) {
+      throw PetitionApiException(
+        _errorMessage(response),
+        statusCode: response.statusCode,
+        responseBody: response.body,
+      );
+    }
+
+    final parsed = _decodeBody(response.body);
+    final jobId = parsed?['job_id'];
+    if (jobId is! String || jobId.isEmpty) {
+      throw const PetitionApiException(
+        'Resposta da submissão em formato inesperado. Job ID não recebido.',
+      );
+    }
+
+    return jobId;
+  }
+
+  /// Polls the status of a case analysis.
+  /// Returns the full analysis result when complete.
+  Future<Map<String, dynamic>> _pollCaseStatus({
+    required String token,
+    required String jobId,
+    Duration timeout = const Duration(minutes: 5),
+    Duration pollInterval = const Duration(seconds: 2),
+  }) async {
+    final startTime = DateTime.now();
+
+    while (true) {
+      if (DateTime.now().difference(startTime) > timeout) {
+        throw const PetitionApiException(
+          'Análise expirou. Tempo limite excedido.',
+        );
+      }
+
+      try {
+        final response = await _httpClient.get(
+          _uri('/case-status/$jobId'),
+          headers: {'Authorization': 'Bearer $token'},
+        ).timeout(const Duration(seconds: 30));
+
+        if (!_isSuccess(response.statusCode)) {
+          throw PetitionApiException(
+            _errorMessage(response),
+            statusCode: response.statusCode,
+            responseBody: response.body,
+          );
+        }
+
+        final parsed = _decodeBody(response.body);
+        final status = parsed?['status'];
+
+        // Check if analysis is complete
+        if (status == 'completed' || status == 'done') {
+          final results = parsed?['results'];
+          if (results is! List) {
+            throw const PetitionApiException(
+              'Resposta da análise em formato inesperado.',
+            );
+          }
+
+          final resultsList = results
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+
+          final summary = parsed?['summary'];
+
+          return {
+            'results': resultsList,
+            'summary': summary is String ? summary : null,
+          };
+        }
+
+        // Still processing, wait before next poll
+        await Future.delayed(pollInterval);
+      } catch (e) {
+        // If it's already our exception, rethrow
+        if (e is PetitionApiException) rethrow;
+        // Otherwise wrap it
+        throw PetitionApiException(
+          'Erro ao verificar status da análise: $e',
+        );
+      }
+    }
+  }
+
   /// Returns a map with keys `results` (List<Map<String, dynamic>>) and
   /// `summary` (String?).
   Future<Map<String, dynamic>> analyzePetition({
@@ -47,50 +161,19 @@ class PetitionApiService {
       throw const PetitionApiException('Quantidade de precedentes invalida.');
     }
 
-    final request = http.MultipartRequest('POST', _uri('/petition/analyze'));
-    request.headers['Authorization'] = 'Bearer $token';
-    request.fields['candidates'] = candidates.toString();
-    request.files.add(
-      http.MultipartFile.fromBytes(
-        'file',
-        pdfBytes,
-        filename: fileName,
-        contentType: MediaType('application', 'pdf'),
-      ),
+    // Submit case for analysis and get job ID
+    final jobId = await _submitCaseAnalysis(
+      token: token,
+      fileName: fileName,
+      pdfBytes: pdfBytes,
+      candidates: candidates,
     );
 
-    final streamedResponse = await request.send().timeout(
-      const Duration(seconds: 90),
+    // Poll for results
+    return await _pollCaseStatus(
+      token: token,
+      jobId: jobId,
     );
-    final response = await http.Response.fromStream(streamedResponse);
-
-    if (!_isSuccess(response.statusCode)) {
-      throw PetitionApiException(
-        _errorMessage(response),
-        statusCode: response.statusCode,
-        responseBody: response.body,
-      );
-    }
-
-    final parsed = _decodeBody(response.body);
-    final results = parsed?['results'];
-    if (results is! List) {
-      throw const PetitionApiException(
-        'Resposta da análise em formato inesperado.',
-      );
-    }
-
-    final resultsList = results
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList();
-
-    final summary = parsed?['summary'];
-
-    return {
-      'results': resultsList,
-      'summary': summary is String ? summary : null,
-    };
   }
 
   /// Fetches the petition analysis history for the authenticated user.
