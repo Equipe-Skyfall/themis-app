@@ -106,7 +106,7 @@ class _PrecedentSheetUI extends StatelessWidget {
 
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFF5F6F7),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
@@ -192,7 +192,8 @@ class _PrecedentSheetUI extends StatelessWidget {
             ),
             const SizedBox(height: 18),
 
-            _buildField(
+            _buildOffsetField(
+              context,
               'Explicação',
               explanationText,
               labelColor: const Color(0xFF1E5EFF),
@@ -262,6 +263,56 @@ class _PrecedentSheetUI extends StatelessWidget {
               color: Colors.grey[900],
               fontSize: 14,
               height: 1.32,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOffsetField(
+    BuildContext context,
+    String label,
+    String value, {
+    Color? labelColor,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: labelColor ?? Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: theme.dividerColor.withOpacity(0.16)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              value,
+              style: TextStyle(
+                color: theme.colorScheme.onSurface,
+                fontSize: 14,
+                height: 1.32,
+              ),
             ),
           ),
         ],
