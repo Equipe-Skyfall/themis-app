@@ -10,6 +10,7 @@ import 'components/pages/settings_page.dart';
 import 'components/pages/results_page.dart';
 import 'components/pages/upload_pdf_screen.dart';
 import 'lib/models.dart';
+import 'lib/profile_mode.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,19 +45,24 @@ class AppController extends HookWidget {
     final auth = useAuthController();
     final isInSettings = useState(false);
     final isInUpload = useState(false);
+
+    // Inicia na aba Advogado por padrão
+    final profileMode = useState<ProfileMode>(ProfileMode.lawyer);
+
     final selectedCase = useState<CaseHistory?>(null);
     final selectedPrecedents = useState<List<Precedent>?>(null);
     final selectedSummary = useState<String?>(null);
+    final selectedAnalysisData = useState<Map<String, dynamic>?>(null);
 
+    // ── Auth ─────────────────────────────────────────────────────────────────
     if (auth.session == null) {
       return AuthPage(onLogin: auth.login, onRegister: auth.register);
     }
 
+    // ── Configurações (sem navbar) ────────────────────────────────────────────
     if (isInSettings.value) {
       return SettingsScreen(
-        onBack: () {
-          isInSettings.value = false;
-        },
+        onBack: () => isInSettings.value = false,
         session: auth.session,
         onProfileUpdated: auth.updateSession,
         onForceLogout: () async {
@@ -66,13 +72,13 @@ class AppController extends HookWidget {
       );
     }
 
+    // ── Upload/análise (sem navbar) ───────────────────────────────────────────
     if (isInUpload.value) {
       return UploadScreen(
         token: auth.session?.token,
-        onBack: () {
-          isInUpload.value = false;
-        },
-        onAnalysisReady: (caseTitle, precedents, summary) {
+        profileMode: profileMode.value,
+        onBack: () => isInUpload.value = false,
+        onAnalysisReady: (caseTitle, precedents, summary, analysisData) {
           final now = DateTime.now();
           selectedCase.value = CaseHistory(
             id: 'analysis_${now.millisecondsSinceEpoch}',
@@ -83,16 +89,19 @@ class AppController extends HookWidget {
           );
           selectedPrecedents.value = precedents;
           selectedSummary.value = summary;
+          selectedAnalysisData.value = analysisData;
           isInUpload.value = false;
         },
       );
     }
 
+    // ── Resultados (sem navbar) ───────────────────────────────────────────────
     if (selectedCase.value != null) {
       return ResultsPage(
         case_: selectedCase.value!,
         precedents: selectedPrecedents.value ?? [],
         summary: selectedSummary.value,
+        analysisData: selectedAnalysisData.value,
         onBack: () {
           selectedCase.value = null;
           selectedPrecedents.value = null;
@@ -101,23 +110,22 @@ class AppController extends HookWidget {
       );
     }
 
+    // ── Dashboard com BottomNav ───────────────────────────────────────────────
     return DashboardPage(
       userName: auth.session?.user.username,
       token: auth.session?.token,
-      onLogout: () {
-        auth.logout();
-      },
-      onOpenSettings: () {
-        isInSettings.value = true;
-      },
-      onNewAnalysis: () {
-        isInUpload.value = true;
-      },
+      profileMode: profileMode.value,
+      onProfileModeChanged: (mode) => profileMode.value = mode,
+      // FAB "+" abre o upload no contexto do perfil ativo
+      onNewAnalysis: () => isInUpload.value = true,
+      onLogout: () => auth.logout(),
+      onOpenSettings: () => isInSettings.value = true,
       onSelectHistory: (entry) {
         selectedCase.value = CaseHistory(
           id: entry.id,
           title: entry.filename,
-          date: '${entry.timestamp.day}/${entry.timestamp.month}/${entry.timestamp.year}',
+          date:
+              '${entry.timestamp.day}/${entry.timestamp.month}/${entry.timestamp.year}',
           status: 'completed',
           matchCount: entry.precedents.length,
         );

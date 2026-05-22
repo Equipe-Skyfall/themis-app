@@ -22,10 +22,9 @@ HistoryController useHistoryController({
   required String? token,
   PetitionApiService? service,
 }) {
-  final petitionService = useMemoized(
-    () => service ?? PetitionApiService(),
-    [service],
-  );
+  final petitionService = useMemoized(() => service ?? PetitionApiService(), [
+    service,
+  ]);
 
   final entries = useState<List<HistoryEntry>>([]);
   final isLoading = useState(false);
@@ -48,9 +47,7 @@ HistoryController useHistoryController({
         if (rawResults is List) {
           for (final item in rawResults) {
             if (item is Map) {
-              precedents.add(
-                toPrecedent(Map<String, dynamic>.from(item)),
-              );
+              precedents.add(toPrecedent(Map<String, dynamic>.from(item)));
             }
           }
         }

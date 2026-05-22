@@ -13,7 +13,7 @@ class PrimaryButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF1E1E2C),
+        backgroundColor: const Color(0xFF1D2A7A),
         foregroundColor: Colors.white,
         minimumSize: const Size(double.infinity, 48),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
