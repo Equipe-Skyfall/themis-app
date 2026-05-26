@@ -17,6 +17,73 @@ class PDFExportService {
   static const _primaryLight = PdfColor.fromInt(0xFFF0F2FF); // Azul muito claro
   static const _borderColor = PdfColor.fromInt(0xFFE0E0E0);
 
+  static Future<String> exportMinutaToPdf(String minuta) async {
+    // Comprehensive sanitization for PDF font compatibility
+    var cleanText = _sanitizeForPdf(minuta);
+
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(30),
+        build: (context) {
+          final paragraphs = cleanText.split('\n');
+          return [
+            pw.Text(
+              'MINUTA DE SENTENCA',
+              style: pw.TextStyle(
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+            pw.SizedBox(height: 20),
+            ...paragraphs.map((p) {
+              if (p.trim().isEmpty) return pw.SizedBox(height: 10);
+              return _buildMarkdownParagraph(p);
+            }),
+          ];
+        },
+      ),
+    );
+
+    final pdfBytes = await pdf.save();
+    final fileName = 'Themis_Minuta_${DateTime.now().toString().replaceAll(RegExp(r'[^0-9]'), '')}.pdf';
+    final downloadsDir = await getDownloadsDirectory();
+    final defaultPath = downloadsDir?.path ?? (await getApplicationDocumentsDirectory()).path;
+
+    final selectedPath = await _showSaveDialog(fileName, defaultPath);
+
+    if (selectedPath == null) {
+      throw Exception('Salvamento cancelado pelo usuario');
+    }
+
+    final file = File(selectedPath);
+    await file.writeAsBytes(pdfBytes);
+
+    return selectedPath;
+  }
+
+  static Future<String> savePdfToDownloads(pw.Document pdf, String fileName) async {
+    try {
+      final pdfBytes = await pdf.save();
+      final downloadsDir = await getDownloadsDirectory();
+      final defaultPath = downloadsDir?.path ?? (await getApplicationDocumentsDirectory()).path;
+
+      final selectedPath = await _showSaveDialog(fileName, defaultPath);
+
+      if (selectedPath == null) {
+        throw Exception('Salvamento cancelado pelo usuário');
+      }
+
+      final file = File(selectedPath);
+      await file.writeAsBytes(pdfBytes);
+
+      return selectedPath;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   static Future<String> exportPrecedentsToPdf(
     List<Precedent> precedents,
     CaseHistory caseHistory,
@@ -435,6 +502,145 @@ class PDFExportService {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Comprehensive sanitization to ensure text only contains characters
+  /// supported by the default PDF font (Latin-1 / Helvetica).
+  static String _sanitizeForPdf(String input) {
+    var text = input;
+
+    // Replace common Unicode dashes with ASCII hyphen
+    text = text.replaceAll('\u2014', '-');  // em dash
+    text = text.replaceAll('\u2013', '-');  // en dash
+    text = text.replaceAll('\u2212', '-');  // minus sign
+    text = text.replaceAll('\u2010', '-');  // hyphen
+    text = text.replaceAll('\u2011', '-');  // non-breaking hyphen
+
+    // Replace smart/curly quotes with straight quotes
+    text = text.replaceAll('\u201C', '"');
+    text = text.replaceAll('\u201D', '"');
+    text = text.replaceAll('\u201E', '"');
+    text = text.replaceAll('\u2018', "'");
+    text = text.replaceAll('\u2019', "'");
+    text = text.replaceAll('\u201A', "'");
+
+    // Replace bullets and special list markers
+    text = text.replaceAll('\u2022', '-');
+    text = text.replaceAll('\u2023', '-');
+    text = text.replaceAll('\u25E6', '-');
+    text = text.replaceAll('\u2043', '-');
+
+    // Replace ellipsis
+    text = text.replaceAll('\u2026', '...');
+
+    // Replace spaces
+    text = text.replaceAll('\u00A0', ' ');
+    text = text.replaceAll('\u2003', ' ');
+    text = text.replaceAll('\u2002', ' ');
+    text = text.replaceAll('\u2009', ' ');
+    text = text.replaceAll('\u200B', '');
+    text = text.replaceAll('\uFEFF', '');
+
+    // Replace other common symbols
+    text = text.replaceAll('\u2192', '->');
+    text = text.replaceAll('\u2190', '<-');
+
+    // Removed markdown stripping here so we can parse it in _buildMarkdownParagraph
+
+    // Remove any remaining non-Latin-1 characters (codepoint > 255)
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      final code = text.codeUnitAt(i);
+      if (code <= 255) {
+        buffer.writeCharCode(code);
+      } else {
+        buffer.write(' ');
+      }
+    }
+    text = buffer.toString();
+
+    return text;
+  }
+
+  static pw.Widget _buildMarkdownParagraph(String text) {
+    if (text.startsWith('# ')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 12, top: 8),
+        child: pw.Text(
+          text.substring(2).replaceAll('**', '').replaceAll('*', ''),
+          style: pw.TextStyle(
+            fontSize: 16,
+            fontWeight: pw.FontWeight.bold,
+            color: _textColor,
+          ),
+        ),
+      );
+    } else if (text.startsWith('## ')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 10, top: 6),
+        child: pw.Text(
+          text.substring(3).replaceAll('**', '').replaceAll('*', ''),
+          style: pw.TextStyle(
+            fontSize: 14,
+            fontWeight: pw.FontWeight.bold,
+            color: _primaryColor,
+          ),
+        ),
+      );
+    } else if (text.startsWith('### ')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 8, top: 4),
+        child: pw.Text(
+          text.substring(4).replaceAll('**', '').replaceAll('*', ''),
+          style: pw.TextStyle(
+            fontSize: 12,
+            fontWeight: pw.FontWeight.bold,
+            color: _textColor,
+          ),
+        ),
+      );
+    } else if (text.startsWith('---')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 8),
+        child: pw.Divider(color: _borderColor),
+      );
+    }
+
+    final spans = <pw.InlineSpan>[];
+    final parts = text.split('**');
+    
+    for (int i = 0; i < parts.length; i++) {
+      if (parts[i].isEmpty) continue;
+      
+      // Clean up remaining single asterisks
+      final textPart = parts[i].replaceAll('*', '');
+      if (textPart.isEmpty) continue;
+      
+      if (i % 2 == 1) {
+        // Bold
+        spans.add(pw.TextSpan(
+          text: textPart,
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ));
+      } else {
+        // Normal
+        spans.add(pw.TextSpan(text: textPart));
+      }
+    }
+
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      child: pw.RichText(
+        textAlign: pw.TextAlign.justify,
+        text: pw.TextSpan(
+          style: const pw.TextStyle(
+            fontSize: 10,
+            height: 1.5,
+          ),
+          children: spans,
+        ),
       ),
     );
   }

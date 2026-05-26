@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import '../ui/app_bar.dart';
 import '../ui/precedent_sheet.dart';
 import '../../lib/models.dart';
@@ -8,6 +14,7 @@ class ResultsPage extends StatefulWidget {
   final CaseHistory case_;
   final List<Precedent> precedents;
   final String? summary;
+  final Map<String, dynamic>? analysisData;
   final VoidCallback onBack;
 
   const ResultsPage({
@@ -15,6 +22,7 @@ class ResultsPage extends StatefulWidget {
     required this.case_,
     required this.precedents,
     this.summary,
+    this.analysisData,
     required this.onBack,
   });
 
@@ -181,6 +189,335 @@ class _ResultsPageState extends State<ResultsPage> {
     }
   }
 
+  void _showMinutaBottomSheet(BuildContext context) {
+    final minuta = widget.analysisData?['minuta'] ?? '';
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Minuta de Sentença',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E1E2C),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => _exportMinutaToPdf(minuta),
+                          icon: const Icon(Icons.download_rounded),
+                          tooltip: 'Download PDF',
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(20),
+                  child: MarkdownBody(
+                    data: minuta,
+                    styleSheet: MarkdownStyleSheet(
+                      h1: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E1E2C),
+                      ),
+                      h2: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1D2A7A),
+                      ),
+                      h3: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E1E2C),
+                      ),
+                      p: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF3A3A4A),
+                        height: 1.6,
+                      ),
+                      strong: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E1E2C),
+                      ),
+                      em: const TextStyle(
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFF3A3A4A),
+                      ),
+                      code: TextStyle(
+                        backgroundColor: Colors.grey[100],
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: Colors.grey[800],
+                      ),
+                      blockquote: TextStyle(
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                      listBullet: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF3A3A4A),
+                        height: 1.6,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Sanitize text to only contain characters supported by the default PDF font (Latin-1).
+  String _sanitizeForPdf(String input) {
+    var text = input;
+
+    // Replace common Unicode dashes with ASCII hyphen
+    text = text.replaceAll('\u2014', '-');  // em dash —
+    text = text.replaceAll('\u2013', '-');  // en dash –
+    text = text.replaceAll('\u2212', '-');  // minus sign −
+    text = text.replaceAll('\u2010', '-');  // hyphen ‐
+    text = text.replaceAll('\u2011', '-');  // non-breaking hyphen ‑
+
+    // Replace smart/curly quotes with straight quotes
+    text = text.replaceAll('\u201C', '"');  // left double "
+    text = text.replaceAll('\u201D', '"');  // right double "
+    text = text.replaceAll('\u201E', '"');  // double low „
+    text = text.replaceAll('\u2018', "'"); // left single '
+    text = text.replaceAll('\u2019', "'"); // right single '
+    text = text.replaceAll('\u201A', "'"); // single low ‚
+
+    // Replace bullets and special list markers
+    text = text.replaceAll('\u2022', '-');  // bullet •
+    text = text.replaceAll('\u2023', '-');  // triangular bullet ‣
+    text = text.replaceAll('\u25E6', '-');  // white bullet ◦
+    text = text.replaceAll('\u2043', '-');  // hyphen bullet ⁃
+
+    // Replace ellipsis
+    text = text.replaceAll('\u2026', '...');  // …
+
+    // Replace spaces
+    text = text.replaceAll('\u00A0', ' ');  // non-breaking space
+    text = text.replaceAll('\u2003', ' ');  // em space
+    text = text.replaceAll('\u2002', ' ');  // en space
+    text = text.replaceAll('\u2009', ' ');  // thin space
+    text = text.replaceAll('\u200B', '');   // zero-width space
+    text = text.replaceAll('\uFEFF', '');   // BOM
+
+    // Replace other common symbols
+    text = text.replaceAll('\u00B0', 'o');  // degree symbol ° -> o (for nº usage)
+    text = text.replaceAll('\u2192', '->'); // right arrow →
+    text = text.replaceAll('\u2190', '<-'); // left arrow ←
+
+    // Removed markdown stripping here so we can parse it in _buildMarkdownParagraph
+
+    // Remove any remaining non-Latin-1 characters (codepoint > 255)
+    // but preserve accented Portuguese characters which ARE in Latin-1
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      final code = text.codeUnitAt(i);
+      if (code <= 255) {
+        buffer.writeCharCode(code);
+      } else {
+        buffer.write(' '); // replace unknown chars with space
+      }
+    }
+    text = buffer.toString();
+
+    return text;
+  }
+
+  pw.Widget _buildMarkdownParagraph(String text) {
+    if (text.startsWith('# ')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 12, top: 8),
+        child: pw.Text(
+          text.substring(2).replaceAll('**', '').replaceAll('*', ''),
+          style: pw.TextStyle(
+            fontSize: 16,
+            fontWeight: pw.FontWeight.bold,
+            color: const PdfColor.fromInt(0xFF1E1E2C),
+          ),
+        ),
+      );
+    } else if (text.startsWith('## ')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 10, top: 6),
+        child: pw.Text(
+          text.substring(3).replaceAll('**', '').replaceAll('*', ''),
+          style: pw.TextStyle(
+            fontSize: 14,
+            fontWeight: pw.FontWeight.bold,
+            color: const PdfColor.fromInt(0xFF1D2A7A), // Azul Themis
+          ),
+        ),
+      );
+    } else if (text.startsWith('### ')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 8, top: 4),
+        child: pw.Text(
+          text.substring(4).replaceAll('**', '').replaceAll('*', ''),
+          style: pw.TextStyle(
+            fontSize: 12,
+            fontWeight: pw.FontWeight.bold,
+            color: const PdfColor.fromInt(0xFF1E1E2C),
+          ),
+        ),
+      );
+    } else if (text.startsWith('---')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 8),
+        child: pw.Divider(color: const PdfColor.fromInt(0xFFE0E0E0)),
+      );
+    }
+
+    final spans = <pw.InlineSpan>[];
+    final parts = text.split('**');
+    
+    for (int i = 0; i < parts.length; i++) {
+      if (parts[i].isEmpty) continue;
+      
+      // Clean up remaining single asterisks
+      final textPart = parts[i].replaceAll('*', '');
+      if (textPart.isEmpty) continue;
+      
+      if (i % 2 == 1) {
+        // Bold
+        spans.add(pw.TextSpan(
+          text: textPart,
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ));
+      } else {
+        // Normal
+        spans.add(pw.TextSpan(text: textPart));
+      }
+    }
+
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      child: pw.RichText(
+        textAlign: pw.TextAlign.justify,
+        text: pw.TextSpan(
+          style: const pw.TextStyle(
+            fontSize: 10,
+            height: 1.5,
+          ),
+          children: spans,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportMinutaToPdf(String minuta) async {
+    try {
+      setState(() => _isExporting = true);
+
+      final cleanText = _sanitizeForPdf(minuta);
+
+      final pdf = pw.Document();
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(30),
+          build: (context) {
+            final paragraphs = cleanText.split('\n');
+            return [
+              pw.Text(
+                'MINUTA DE SENTENCA',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              ...paragraphs.map((p) {
+                if (p.trim().isEmpty) return pw.SizedBox(height: 10);
+                return _buildMarkdownParagraph(p);
+              }),
+            ];
+          },
+        ),
+      );
+
+      final pdfBytes = await pdf.save();
+      final fileName = 'Themis_Minuta_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final downloadsDir = await getDownloadsDirectory();
+      final defaultPath = downloadsDir?.path ?? (await getApplicationDocumentsDirectory()).path;
+
+      final selectedPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Salvar Minuta de Sentenca',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        initialDirectory: defaultPath,
+      );
+
+      if (selectedPath == null) {
+        return;
+      }
+
+      final file = File(selectedPath);
+      await file.writeAsBytes(pdfBytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF salvo: ${selectedPath.split('\\').last}'),
+            backgroundColor: const Color(0xFF4CAF50),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro: $e'),
+            backgroundColor: const Color(0xFFD94841),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final visiblePrecedents = _visiblePrecedents;
@@ -274,6 +611,77 @@ class _ResultsPageState extends State<ResultsPage> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+
+            // ── MINUTA DE SENTENÇA ──
+            if (widget.analysisData != null && widget.analysisData!['minuta'] != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: InkWell(
+                  onTap: () => _showMinutaBottomSheet(context),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1D2A7A).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.description_rounded,
+                            color: Color(0xFF1D2A7A),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Minuta de Sentença',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E1E2C),
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Visualizar sentença gerada pela IA',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF74839A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: Color(0xFF74839A),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
