@@ -4,7 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import '../ui/app_bar.dart';
 import '../ui/bottom_nav_bar.dart';
 import '../../hooks/use_history_controller.dart';
-import '../../hooks/use_case_history_controller.dart';
+import '../../hooks/use_judge_case_history_controller.dart';
 import '../../lib/models.dart';
 import '../../lib/profile_mode.dart';
 
@@ -20,6 +20,9 @@ class DashboardPage extends HookWidget {
   /// Abre o fluxo de nova análise de acordo com o [profileMode] atual
   final VoidCallback onNewAnalysis;
 
+  /// Abre o histórico completo de processos (Frente 2)
+  final VoidCallback? onViewAllHistory;
+
   const DashboardPage({
     super.key,
     required this.profileMode,
@@ -30,23 +33,24 @@ class DashboardPage extends HookWidget {
     this.onLogout,
     this.onOpenSettings,
     this.onSelectHistory,
+    this.onViewAllHistory,
   });
 
   @override
   Widget build(BuildContext context) {
     final petitionHistory = useHistoryController(token: token);
-    final caseHistory = useCaseHistoryController(token: token);
+    final judgeHistory = useJudgeCaseHistoryController(token: token);
 
     final bool isJudge = profileMode == ProfileMode.judge;
 
     final List<HistoryEntry> historyEntries =
-        isJudge ? caseHistory.entries : petitionHistory.entries;
+        isJudge ? judgeHistory.entries : petitionHistory.entries;
     final bool isLoading =
-        isJudge ? caseHistory.isLoading : petitionHistory.isLoading;
+        isJudge ? judgeHistory.isLoading : petitionHistory.isLoading;
     final String? errorMsg =
-        isJudge ? caseHistory.errorMessage : petitionHistory.errorMessage;
+        isJudge ? judgeHistory.errorMessage : petitionHistory.errorMessage;
     final Future<void> Function() refreshFn =
-        isJudge ? caseHistory.refresh : petitionHistory.refresh;
+        isJudge ? judgeHistory.refresh : petitionHistory.refresh;
 
     final activeHistory = HistoryController(
       entries: historyEntries,
@@ -101,6 +105,7 @@ class DashboardPage extends HookWidget {
             onPageChanged: (newPage) {
               currentPage.value = newPage;
             },
+            onViewAllHistory: onViewAllHistory,
           ),
         ),
       ),
@@ -166,6 +171,7 @@ class _DashboardBody extends StatelessWidget {
   final int currentPage;
   final int totalPages;
   final void Function(int) onPageChanged;
+  final VoidCallback? onViewAllHistory;
 
   const _DashboardBody({
     super.key,
@@ -177,6 +183,7 @@ class _DashboardBody extends StatelessWidget {
     required this.onPageChanged,
     this.onLogout,
     this.onSelectHistory,
+    this.onViewAllHistory,
   });
 
   @override
@@ -301,13 +308,31 @@ class _DashboardBody extends StatelessWidget {
           else if (activeHistory.entries.isEmpty)
             _EmptyState(message: config.emptyMessage)
           else ...[
-            Text(
-              config.historyTitle,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1E1E2C),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  config.historyTitle,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1E1E2C),
+                  ),
+                ),
+                if (isJudge && activeHistory.entries.isNotEmpty && onViewAllHistory != null)
+                  GestureDetector(
+                    onTap: onViewAllHistory,
+                    child: Text(
+                      'Ver tudo',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1D2A7A),
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             ...pageEntries.map((entry) => _HistoryCard(

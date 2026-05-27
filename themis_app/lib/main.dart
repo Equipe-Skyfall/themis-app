@@ -9,6 +9,7 @@ import 'components/pages/dashboard_page.dart';
 import 'components/pages/settings_page.dart';
 import 'components/pages/results_page.dart';
 import 'components/pages/upload_pdf_screen.dart';
+import 'components/pages/case_history_page.dart';
 import 'lib/models.dart';
 import 'lib/profile_mode.dart';
 
@@ -45,6 +46,7 @@ class AppController extends HookWidget {
     final auth = useAuthController();
     final isInSettings = useState(false);
     final isInUpload = useState(false);
+    final isInCaseHistory = useState(false);
 
     // Inicia na aba Advogado por padrão
     final profileMode = useState<ProfileMode>(ProfileMode.lawyer);
@@ -95,6 +97,27 @@ class AppController extends HookWidget {
       );
     }
 
+    // ── Histórico de Processos (Frente 2) ─────────────────────────────────────
+    if (isInCaseHistory.value) {
+      return CaseHistoryPage(
+        token: auth.session?.token,
+        onBack: () => isInCaseHistory.value = false,
+        onSelectHistory: (entry) {
+          selectedCase.value = CaseHistory(
+            id: entry.id,
+            title: entry.filename,
+            date:
+                '${entry.timestamp.day}/${entry.timestamp.month}/${entry.timestamp.year}',
+            status: 'completed',
+            matchCount: entry.precedents.length,
+          );
+          selectedPrecedents.value = entry.precedents;
+          selectedSummary.value = entry.summary;
+          isInCaseHistory.value = false;
+        },
+      );
+    }
+
     // ── Resultados (sem navbar) ───────────────────────────────────────────────
     if (selectedCase.value != null) {
       return ResultsPage(
@@ -132,6 +155,10 @@ class AppController extends HookWidget {
         selectedPrecedents.value = entry.precedents;
         selectedSummary.value = entry.summary;
       },
+      // Abre o histórico completo de processos (Frente 2)
+      onViewAllHistory: profileMode.value == ProfileMode.judge
+          ? () => isInCaseHistory.value = true
+          : null,
     );
   }
 }

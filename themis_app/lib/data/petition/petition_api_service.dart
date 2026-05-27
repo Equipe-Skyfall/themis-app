@@ -95,7 +95,6 @@ class PetitionApiService {
     return _formatAnalysisResult(result, candidates);
   }
 
-  /// Análise de PROCESSO para o Juiz.
   /// 1. POST /petition/analyze-case  → retorna job_id
   /// 2. Polls /petition/case-status/{job_id} até status == "done"
   /// 3. Formata e retorna o resultado
@@ -117,7 +116,7 @@ class PetitionApiService {
 
     final request = http.MultipartRequest(
       'POST',
-      _uri('/petition/analyze-case'),
+      _uri('/petition/analyze-case-test'),
     );
     request.headers['Authorization'] = 'Bearer $token';
     request.files.add(
@@ -130,7 +129,7 @@ class PetitionApiService {
     );
 
     if (kDebugMode) {
-      debugPrint('[API] Enviando PDF para /petition/analyze-case');
+      debugPrint('[API] Enviando PDF para /petition/analyze-case-test');
     }
 
     final streamedResponse =

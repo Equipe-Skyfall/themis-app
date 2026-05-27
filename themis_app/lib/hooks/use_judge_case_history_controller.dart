@@ -1,42 +1,16 @@
-// themis_app/lib/hooks/use_case_history_controller.dart
+// themis_app/lib/hooks/use_judge_case_history_controller.dart
 import 'package:flutter_hooks/flutter_hooks.dart';
 
-import '../data/petition/petition_api_service.dart';
+import '../data/petition/case_analysis_api_service.dart';
 import '../lib/models.dart';
 
-/// Entry retornada por /petition/case-analysis-history
-class CaseAnalysisEntry {
-  final String id;
-  final String filename;
-  final DateTime timestamp;
-  final String caseSummary;
-  final String? minuta;
-
-  const CaseAnalysisEntry({
-    required this.id,
-    required this.filename,
-    required this.timestamp,
-    required this.caseSummary,
-    this.minuta,
-  });
-
-  /// Converte para HistoryEntry para reutilizar os cards existentes.
-  HistoryEntry toHistoryEntry() => HistoryEntry(
-        id: id,
-        filename: filename,
-        timestamp: timestamp,
-        summary: caseSummary,
-        precedents: const [],
-      );
-}
-
-class CaseHistoryController {
+class JudgeCaseHistoryController {
   final List<HistoryEntry> entries;
   final bool isLoading;
   final String? errorMessage;
   final Future<void> Function() refresh;
 
-  const CaseHistoryController({
+  const JudgeCaseHistoryController({
     required this.entries,
     required this.isLoading,
     required this.errorMessage,
@@ -44,12 +18,12 @@ class CaseHistoryController {
   });
 }
 
-CaseHistoryController useCaseHistoryController({
+JudgeCaseHistoryController useJudgeCaseHistoryController({
   required String? token,
-  PetitionApiService? service,
+  CaseAnalysisApiService? service,
 }) {
-  final petitionService = useMemoized(
-    () => service ?? PetitionApiService(),
+  final caseAnalysisService = useMemoized(
+    () => service ?? CaseAnalysisApiService(),
     [service],
   );
 
@@ -64,7 +38,7 @@ CaseHistoryController useCaseHistoryController({
     errorMessage.value = null;
 
     try {
-      final rawList = await petitionService.fetchCaseAnalysisHistory(token: token);
+      final rawList = await caseAnalysisService.fetchCaseAnalysisHistory(token: token);
 
       entries.value = rawList.map((raw) {
         DateTime timestamp;
@@ -82,7 +56,7 @@ CaseHistoryController useCaseHistoryController({
           precedents: const [],
         );
       }).toList();
-    } on PetitionApiException catch (e) {
+    } on CaseAnalysisApiException catch (e) {
       errorMessage.value = e.message;
     } catch (_) {
       errorMessage.value = 'Não foi possível carregar o histórico de processos.';
@@ -96,7 +70,7 @@ CaseHistoryController useCaseHistoryController({
     return null;
   }, [token]);
 
-  return CaseHistoryController(
+  return JudgeCaseHistoryController(
     entries: entries.value,
     isLoading: isLoading.value,
     errorMessage: errorMessage.value,
