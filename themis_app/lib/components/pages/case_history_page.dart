@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:intl/intl.dart';
 
-import '../../hooks/use_judge_case_history_controller.dart';
+import '../../hooks/use_history_controller.dart';
 import '../../lib/models.dart';
 import '../ui/app_bar.dart';
 
@@ -23,7 +23,7 @@ class CaseHistoryPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final judgeHistory = useJudgeCaseHistoryController(token: token);
+    final history = useHistoryController(token: token);
 
     return Scaffold(
       backgroundColor: _background,
@@ -33,20 +33,20 @@ class CaseHistoryPage extends HookWidget {
         onBack: onBack,
       ),
       body: RefreshIndicator(
-        onRefresh: judgeHistory.refresh,
-        child: judgeHistory.isLoading && judgeHistory.entries.isEmpty
+        onRefresh: history.refresh,
+        child: history.isLoading && history.entries.isEmpty
             ? const Center(
                 child: CircularProgressIndicator(color: _primary),
               )
-            : judgeHistory.entries.isEmpty
+            : history.entries.isEmpty
                 ? _EmptyState(
                     onBack: onBack,
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
-                    itemCount: judgeHistory.entries.length,
+                    itemCount: history.entries.length,
                     itemBuilder: (context, index) {
-                      final entry = judgeHistory.entries[index];
+                      final entry = history.entries[index];
                       return _CaseHistoryCard(
                         entry: entry,
                         onTap: () => onSelectHistory?.call(entry),

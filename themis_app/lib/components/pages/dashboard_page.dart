@@ -4,7 +4,6 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import '../ui/app_bar.dart';
 import '../ui/bottom_nav_bar.dart';
 import '../../hooks/use_history_controller.dart';
-import '../../hooks/use_judge_case_history_controller.dart';
 import '../../lib/models.dart';
 import '../../lib/profile_mode.dart';
 
@@ -38,25 +37,13 @@ class DashboardPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final petitionHistory = useHistoryController(token: token);
-    final judgeHistory = useJudgeCaseHistoryController(token: token);
-
-    final bool isJudge = profileMode == ProfileMode.judge;
-
-    final List<HistoryEntry> historyEntries =
-        isJudge ? judgeHistory.entries : petitionHistory.entries;
-    final bool isLoading =
-        isJudge ? judgeHistory.isLoading : petitionHistory.isLoading;
-    final String? errorMsg =
-        isJudge ? judgeHistory.errorMessage : petitionHistory.errorMessage;
-    final Future<void> Function() refreshFn =
-        isJudge ? judgeHistory.refresh : petitionHistory.refresh;
+    final history = useHistoryController(token: token);
 
     final activeHistory = HistoryController(
-      entries: historyEntries,
-      isLoading: isLoading,
-      errorMessage: errorMsg,
-      refresh: refreshFn,
+      entries: history.entries,
+      isLoading: history.isLoading,
+      errorMessage: history.errorMessage,
+      refresh: history.refresh,
     );
 
     final config = _DashboardConfig.forMode(profileMode, userName);
@@ -71,9 +58,9 @@ class DashboardPage extends HookWidget {
     }, [profileMode]);
 
     final itemsPerPage = 5;
-    final totalItems = historyEntries.length;
+    final totalItems = history.entries.length;
     final totalPages = (totalItems / itemsPerPage).ceil();
-    final page = currentPage.value.clamp(1, totalPages > 0 ? totalPages : 1);
+    final page = currentPage.value.clamp(1, totalPages > 0 ? totalPages : 1).toInt();
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -99,7 +86,7 @@ class DashboardPage extends HookWidget {
             onLogout: onLogout,
             activeHistory: activeHistory,
             onSelectHistory: onSelectHistory,
-            isJudge: isJudge,
+            isJudge: profileMode == ProfileMode.judge,
             currentPage: page,
             totalPages: totalPages,
             onPageChanged: (newPage) {
@@ -192,7 +179,7 @@ class _DashboardBody extends StatelessWidget {
 
     // ── Pagination logic ──
     final startIndex = (currentPage - 1) * 5;
-    final endIndex = (startIndex + 5).clamp(0, activeHistory.entries.length);
+    final endIndex = (startIndex + 5).clamp(0, activeHistory.entries.length).toInt();
     final pageEntries = activeHistory.entries.sublist(startIndex, endIndex);
 
     return SingleChildScrollView(
