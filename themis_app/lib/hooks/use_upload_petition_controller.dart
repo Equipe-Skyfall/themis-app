@@ -3,8 +3,9 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
-import '../data/petition/petition_api_service.dart';
-import '../lib/models.dart';
+import 'package:themis_app/data/petition/petition_api_service.dart';
+import 'package:themis_app/data/petition/case_analysis_api_service.dart';
+import 'package:themis_app/lib/models.dart';
 
 class AnalysisResult {
   final List<Precedent> precedents;
@@ -28,8 +29,7 @@ class UploadPetitionController {
   final Future<AnalysisResult?> Function({required int limit}) generateAnalysis;
 
   /// Análise de processo — Juiz
-  final Future<AnalysisResult?> Function({required int limit})
-      generateCaseAnalysis;
+  final Future<AnalysisResult?> Function({required int limit}) generateCaseAnalysis;
 
   const UploadPetitionController({
     required this.selectedFile,
@@ -44,10 +44,16 @@ class UploadPetitionController {
 UploadPetitionController useUploadPetitionController({
   required String? token,
   PetitionApiService? service,
+  CaseAnalysisApiService? caseAnalysisService,
 }) {
   final petitionService = useMemoized(
     () => service ?? PetitionApiService(),
     [service],
+  );
+
+  final caseService = useMemoized(
+    () => caseAnalysisService ?? CaseAnalysisApiService(),
+    [caseAnalysisService],
   );
 
   final selectedFile = useState<PlatformFile?>(null);
@@ -65,7 +71,6 @@ UploadPetitionController useUploadPetitionController({
     errorMessage.value = null;
   }
 
-  /// Retorna (fileName, bytes) após validar token + arquivo, ou null se inválido
   (String, Uint8List)? validateInput() {
     final tok = token;
     if (tok == null || tok.isEmpty) {
@@ -79,14 +84,13 @@ UploadPetitionController useUploadPetitionController({
     }
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
-      errorMessage.value =
-          'Não foi possível ler o PDF. Tente selecionar novamente.';
+      errorMessage.value = 'Não foi possível ler o PDF. Tente selecionar novamente.';
       return null;
     }
     return (file.name, bytes);
   }
 
-  // ── Análise de PETIÇÃO (Advogado) ──────────────────────────────────────────
+  // ── Análise de PETIÇÃO (Advogado) → petitionService → /analyze-case-test ──
   Future<AnalysisResult?> generateAnalysis({required int limit}) async {
     if (limit <= 0) {
       errorMessage.value = 'Quantidade de precedentes inválida.';
@@ -108,8 +112,7 @@ UploadPetitionController useUploadPetitionController({
         onStatusUpdate: null,
       );
 
-      final rawResults =
-          response['results'] as List<Map<String, dynamic>>;
+      final rawResults = response['results'] as List<Map<String, dynamic>>;
       final summary = response['summary'] as String?;
       final analysisData = response['analysis_data'] as Map<String, dynamic>?;
 
@@ -129,7 +132,7 @@ UploadPetitionController useUploadPetitionController({
     }
   }
 
-  // ── Análise de PROCESSO (Juiz) ─────────────────────────────────────────────
+  // ── Análise de PROCESSO (Juiz) → caseService → /analyze-case ──────────────
   Future<AnalysisResult?> generateCaseAnalysis({required int limit}) async {
     if (limit <= 0) {
       errorMessage.value = 'Quantidade de precedentes inválida.';
@@ -143,7 +146,7 @@ UploadPetitionController useUploadPetitionController({
     errorMessage.value = null;
 
     try {
-      final response = await petitionService.analyzeCaseWithPolling(
+      final response = await caseService.analyzeCaseWithPolling(
         token: token ?? '',
         fileName: fileName,
         pdfBytes: bytes,
@@ -166,7 +169,7 @@ UploadPetitionController useUploadPetitionController({
         summary: summary,
         analysisData: analysisData,
       );
-    } on PetitionApiException catch (e) {
+    } on CaseAnalysisApiException catch (e) {
       errorMessage.value = e.message;
       return null;
     } catch (_) {
