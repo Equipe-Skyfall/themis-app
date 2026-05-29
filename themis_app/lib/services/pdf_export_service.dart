@@ -172,28 +172,6 @@ class PDFExportService {
     final cleanPetition =
         petitionText != null ? _sanitizeForPdf(petitionText) : null;
 
-    String _statusLabel(String status) {
-      switch (status) {
-        case 'applicable':
-          return 'Aplicavel';
-        case 'not_applicable':
-          return 'Nao Aplicavel';
-        default:
-          return 'Possivelmente Aplicavel';
-      }
-    }
-
-    PdfColor _statusColor(String status) {
-      switch (status) {
-        case 'applicable':
-          return const PdfColor.fromInt(0xFF4CAF50);
-        case 'not_applicable':
-          return const PdfColor.fromInt(0xFFD94841);
-        default:
-          return const PdfColor.fromInt(0xFFF9A825);
-      }
-    }
-
     final pdf = pw.Document();
 
     pdf.addPage(
@@ -322,7 +300,7 @@ class PDFExportService {
             widgets.add(pw.SizedBox(height: 16));
           }
 
-          // ── Seção: Precedentes ──
+          // ── Seção: Precedentes (mesmo card do PDF do Juiz) ──
           if (precedents.isNotEmpty) {
             widgets.add(pw.Text(
               'PRECEDENTES ENCONTRADOS',
@@ -336,131 +314,8 @@ class PDFExportService {
             widgets.add(pw.SizedBox(height: 12));
 
             for (int i = 0; i < precedents.length; i++) {
-              final data = precedents[i];
-              final p = data.precedent;
-              final statusLabel = _statusLabel(p.status);
-              final statusClr = _statusColor(p.status);
-              final cleanSummary = _sanitizeForPdf(p.summary);
-              final cleanTese = _sanitizeForPdf(p.thesis);
-
-              widgets.add(
-                pw.Container(
-                  width: double.infinity,
-                  margin: const pw.EdgeInsets.only(bottom: 14),
-                  padding: const pw.EdgeInsets.all(14),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: _borderColor),
-                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      // Título + similaridade
-                      pw.Row(
-                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Expanded(
-                            child: pw.Text(
-                              '${i + 1}. ${_sanitizeForPdf(p.title)}',
-                              style: pw.TextStyle(
-                                fontSize: 12,
-                                fontWeight: pw.FontWeight.bold,
-                                color: _textColor,
-                              ),
-                            ),
-                          ),
-                          pw.Text(
-                            '${p.similarity.toStringAsFixed(0)}%',
-                            style: pw.TextStyle(
-                              fontSize: 16,
-                              fontWeight: pw.FontWeight.bold,
-                              color: _primaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      pw.SizedBox(height: 4),
-                      // Tribunal + badge status
-                      pw.Row(
-                        children: [
-                          pw.Text(
-                            _sanitizeForPdf(p.tribunal),
-                            style: pw.TextStyle(fontSize: 10, color: _greyColor),
-                          ),
-                          pw.SizedBox(width: 10),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: pw.BoxDecoration(
-                              color: PdfColor(
-                                statusClr.red,
-                                statusClr.green,
-                                statusClr.blue,
-                                0.15,
-                              ),
-                              borderRadius:
-                                  const pw.BorderRadius.all(pw.Radius.circular(12)),
-                              border: pw.Border.all(color: statusClr, width: 0.5),
-                            ),
-                            child: pw.Text(
-                              statusLabel,
-                              style: pw.TextStyle(
-                                fontSize: 9,
-                                fontWeight: pw.FontWeight.bold,
-                                color: statusClr,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      pw.SizedBox(height: 8),
-                      // Resumo/enunciado
-                      if (cleanSummary.trim().isNotEmpty) ...[
-                        pw.Text(
-                          'ENUNCIADO',
-                          style: pw.TextStyle(
-                            fontSize: 8,
-                            fontWeight: pw.FontWeight.bold,
-                            color: _greyColor,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(
-                          cleanSummary,
-                          style: const pw.TextStyle(
-                              fontSize: 10, height: 1.4,
-                              color: PdfColor.fromInt(0xFF3A3A4A)),
-                        ),
-                      ],
-                      // Tese (opcional)
-                      if (data.includeTese && cleanTese.trim().isNotEmpty) ...[
-                        pw.SizedBox(height: 8),
-                        pw.Text(
-                          'TESE',
-                          style: pw.TextStyle(
-                            fontSize: 8,
-                            fontWeight: pw.FontWeight.bold,
-                            color: _greyColor,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        pw.SizedBox(height: 4),
-                        pw.Text(
-                          cleanTese,
-                          style: pw.TextStyle(
-                            fontSize: 10,
-                            height: 1.4,
-                            color: _primaryColor,
-                            fontStyle: pw.FontStyle.italic,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
+              widgets.add(_buildPrecedentCard(precedents[i].precedent, i + 1));
+              widgets.add(pw.SizedBox(height: 12));
             }
           }
 
