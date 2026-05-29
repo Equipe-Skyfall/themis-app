@@ -37,7 +37,7 @@ class DashboardPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final history = useHistoryController(token: token, profileMode: profileMode);
+    final history = useHistoryController(token: token);
 
     final activeHistory = HistoryController(
       entries: history.entries,

@@ -1,31 +1,13 @@
 import 'dart:async';
-import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
-import '../../data/petition/petition_api_service.dart';
-import '../../data/petition/case_analysis_api_service.dart';
+import '../../hooks/use_upload_petition_controller.dart';
 import 'package:themis_app/lib/models.dart';
 import 'package:themis_app/lib/profile_mode.dart';
 import '../ui/app_bar.dart';
-import '../../hooks/use_upload_petition_controller.dart' show toPrecedent;
-
-const _orgaoOptions = <String>[
-  'STF',
-  'STJ',
-  'TST',
-  'TRF',
-  'TRT',
-  'TJSP',
-  'TJRJ',
-  'TJMG',
-  'TJRS',
-  'TJPR',
-  'TJSC',
-];
 
 class UploadScreen extends HookWidget {
   final String? token;
@@ -38,43 +20,31 @@ class UploadScreen extends HookWidget {
     Map<String, dynamic>? analysisData,
   )? onAnalysisReady;
 
-  /// Chamado quando a petição é gerada (Frente 1 — Advogado).
-  final void Function(
-    String petitionText,
-    String caseDescription,
-    List<Precedent> precedents,
-    bool weakPrecedents,
-  )? onPetitionGenerated;
-
   const UploadScreen({
     super.key,
     required this.token,
     required this.profileMode,
     this.onBack,
     this.onAnalysisReady,
-    this.onPetitionGenerated,
   });
+
+  static const Color _primary = Color(0xFF1D2A7A);
 
   @override
   Widget build(BuildContext context) {
-    final isJudge = profileMode == ProfileMode.judge;
-
-    // ── Estado compartilhado ──
+    final upload = useUploadPetitionController(token: token);
     final isLoadingVisible = useState(false);
     final loadingStep = useState(0);
-
-    // ── Estado do Juiz (upload PDF) ──
-    final judgeService = useMemoized(() => CaseAnalysisApiService());
-    final selectedFile = useState<PlatformFile?>(null);
     final resultsLimit = useState(10);
     final limitController = useTextEditingController(text: '10');
     final limitError = useState<String?>(null);
 
-    // ── Estado do Advogado (Nova Petição) ──
-    final petitionService = useMemoized(() => PetitionApiService());
+    // Aba de texto (só para Advogado)
     final textController = useTextEditingController();
-    final selectedOrgao = useState<String?>(null);
-    final attachedFile = useState<PlatformFile?>(null);
+    final activeTab = useState(0); // 0 = PDF, 1 = Texto
+
+    final bool isJudge = profileMode == ProfileMode.judge;
+    final bool hasFile = upload.selectedFile != null;
 
     // ── Loading step timer ──
     useEffect(() {
@@ -90,181 +60,112 @@ class UploadScreen extends HookWidget {
       return timer.cancel;
     }, [isLoadingVisible.value]);
 
-    // ── Selecionar PDF para Juiz ──
-    Future<void> pickJudgePDF() async {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf'],
-        withData: true,
-      );
-      if (result != null && result.files.isNotEmpty) {
-        selectedFile.value = result.files.first;
-      }
-    }
-
-    // ── Anexar PDF para Advogado ──
-    Future<void> attachLawyerPDF() async {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf'],
-        withData: true,
-      );
-      if (result != null && result.files.isNotEmpty) {
-        attachedFile.value = result.files.first;
-      }
-    }
-
-    // ── Submit Juiz ──
-    Future<void> submitJudge() async {
+    // ── Submit ──
+    Future<void> onSubmit() async {
       final parsedLimit = int.tryParse(limitController.text.trim());
       if (parsedLimit == null || parsedLimit <= 0) {
         limitError.value = 'Digite um número maior que 0.';
         return;
       }
+
       if (parsedLimit > 20) {
         limitError.value = 'Use no máximo 20 precedentes.';
         return;
       }
-      limitError.value = null;
-      resultsLimit.value = parsedLimit;
 
-      final file = selectedFile.value;
-      if (file == null) {
+      resultsLimit.value = parsedLimit;
+      limitError.value = null;
+
+      // Modo Advogado + aba Texto
+      if (!isJudge && activeTab.value == 1) {
+        if (textController.text.trim().isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cole o texto da petição antes de continuar.'),
+            ),
+          );
+          return;
+        }
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            builder: (_) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              title: const Text('Em breve 🚀'),
+              content: const Text(
+                'A análise via texto colado estará disponível em breve. '
+                'Por enquanto, utilize o upload de PDF.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Entendi'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      if (!hasFile) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Selecione um PDF primeiro.')),
         );
         return;
       }
-      final bytes = file.bytes;
-      if (bytes == null || bytes.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Não foi possível ler o PDF.')),
-        );
-        return;
-      }
 
       isLoadingVisible.value = true;
 
-      try {
-        final response = await judgeService.analyzeCaseWithPolling(
-          token: token ?? '',
-          fileName: file.name,
-          pdfBytes: bytes,
-          candidates: parsedLimit,
-        );
+      // Chama a rota certa dependendo do perfil
+      final result = isJudge
+          ? await upload.generateCaseAnalysis(limit: parsedLimit)
+          : await upload.generateAnalysis(limit: parsedLimit);
 
-        isLoadingVisible.value = false;
+      isLoadingVisible.value = false;
 
-        final rawList = response['results'];
-        final rawResults = (rawList is List)
-            ? rawList
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList()
-            : <Map<String, dynamic>>[];
-
-        if (rawResults.isEmpty) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Nenhum precedente encontrado.')),
-            );
-          }
-          return;
-        }
-
-        final precedents = rawResults.map(toPrecedent).toList();
-        final summary = response['summary'] as String?;
-        final analysisData = response['analysis_data'] as Map<String, dynamic>?;
-
-        onAnalysisReady?.call(
-          'Processo - ${file.name}',
-          precedents.take(parsedLimit).toList(),
-          summary,
-          analysisData,
-        );
-      } on CaseAnalysisApiException catch (e) {
-        isLoadingVisible.value = false;
-        if (context.mounted) {
+      if (result == null) {
+        if (upload.errorMessage != null && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.message)),
+            SnackBar(content: Text(upload.errorMessage!)),
           );
         }
-      } catch (_) {
-        isLoadingVisible.value = false;
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erro ao analisar processo. Tente novamente.')),
-          );
-        }
-      }
-    }
-
-    // ── Submit Advogado ──
-    Future<void> submitLawyer() async {
-      final description = textController.text.trim();
-      if (description.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Descreva o caso antes de continuar.')),
-        );
         return;
       }
 
-      isLoadingVisible.value = true;
-
-      try {
-        final file = attachedFile.value;
-        final Uint8List? pdfBytes = file?.bytes;
-        final String? pdfFileName = file?.name;
-
-        final result = await petitionService.generatePetitionWithPolling(
-          token: token ?? '',
-          caseDescription: description,
-          orgaoFilter: selectedOrgao.value,
-          pdfBytes: pdfBytes,
-          pdfFileName: pdfFileName,
-        );
-
-        isLoadingVisible.value = false;
-
-        final petitionText = result['petition_text'] as String? ?? '';
-        if (petitionText.isEmpty) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Não foi possível gerar a petição. Tente novamente.'),
-              ),
-            );
-          }
-          return;
-        }
-
-        final rawList =
-            (result['precedent_results'] as List<Map<String, dynamic>>?) ?? [];
-        final precedents = rawList.map(toPrecedent).toList();
-        final weakPrecedents = result['weak_precedents'] as bool? ?? false;
-
-        onPetitionGenerated?.call(petitionText, description, precedents, weakPrecedents);
-      } on PetitionApiException catch (e) {
-        isLoadingVisible.value = false;
+      if (result.precedents.isEmpty) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.message)),
+            const SnackBar(content: Text('Nenhum precedente encontrado.')),
           );
         }
-      } catch (_) {
-        isLoadingVisible.value = false;
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erro ao gerar petição. Tente novamente.')),
-          );
-        }
+        return;
       }
+
+      final fileName = upload.selectedFile?.name ?? 'Arquivo';
+      final limited = result.precedents.take(parsedLimit).toList();
+      onAnalysisReady?.call(
+        isJudge ? 'Processo - $fileName' : 'Petição - $fileName',
+        limited,
+        result.summary,
+        result.analysisData,
+      );
     }
 
     // ── Loading screen ──
     if (isLoadingVisible.value) {
       return _LoadingScreen(step: loadingStep.value, isJudge: isJudge);
     }
+
+    // ── Títulos por perfil ──
+    final title = isJudge ? 'Nova Análise de Processo' : 'Nova Análise de Petição';
+    final subtitle = isJudge
+        ? 'Envie o PDF do processo para análise jurídica'
+        : 'Upload de PDF ou cole o texto da petição';
+    final buttonLabel =
+        isJudge ? 'Analisar Processo' : 'Gerar Análise Jurídica';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -273,484 +174,414 @@ class UploadScreen extends HookWidget {
         showSettings: false,
         onBack: onBack ?? () => Navigator.of(context).maybePop(),
       ),
-      body: isJudge
-          ? _JudgeForm(
-              selectedFile: selectedFile.value,
-              resultsLimit: resultsLimit.value,
-              limitController: limitController,
-              limitError: limitError.value,
-              onPickFile: pickJudgePDF,
-              onSubmit: submitJudge,
-              onLimitChanged: (val) {
-                resultsLimit.value = val;
-                limitController.text = val.toString();
-                limitError.value = null;
-              },
-              onLimitErrorClear: () => limitError.value = null,
-            )
-          : _LawyerForm(
-              textController: textController,
-              selectedOrgao: selectedOrgao.value,
-              attachedFile: attachedFile.value,
-              onOrgaoChanged: (v) => selectedOrgao.value = v,
-              onAttachFile: attachLawyerPDF,
-              onRemoveFile: () => attachedFile.value = null,
-              onSubmit: submitLawyer,
-            ),
-    );
-  }
-}
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Cabeçalho ──
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E1E2C))),
+            const SizedBox(height: 4),
+            Text(subtitle,
+                style: const TextStyle(color: Colors.grey, fontSize: 14)),
+            const SizedBox(height: 20),
 
-// ─── Formulário do Juiz (upload PDF + filtro de precedentes) ──────────────────
+            // ── Tabs (só Advogado) ──
+            if (!isJudge) ...[
+              _TabBar(
+                activeIndex: activeTab.value,
+                onTabChanged: (i) => activeTab.value = i,
+              ),
+              const SizedBox(height: 16),
+            ],
 
-class _JudgeForm extends StatelessWidget {
-  final PlatformFile? selectedFile;
-  final int resultsLimit;
-  final TextEditingController limitController;
-  final String? limitError;
-  final VoidCallback onPickFile;
-  final Future<void> Function() onSubmit;
-  final void Function(int) onLimitChanged;
-  final VoidCallback onLimitErrorClear;
-
-  const _JudgeForm({
-    required this.selectedFile,
-    required this.resultsLimit,
-    required this.limitController,
-    required this.limitError,
-    required this.onPickFile,
-    required this.onSubmit,
-    required this.onLimitChanged,
-    required this.onLimitErrorClear,
-  });
-
-  static const Color _primary = Color(0xFF1D2A7A);
-
-  @override
-  Widget build(BuildContext context) {
-    final hasFile = selectedFile != null;
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Nova Análise de Processo',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E1E2C),
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Envie o PDF do processo para análise jurídica',
-            style: TextStyle(color: Colors.grey, fontSize: 14),
-          ),
-          const SizedBox(height: 20),
-
-          // Filtro de precedentes
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.filter_list_rounded,
-                        size: 18,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Quantidade de precedentes',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              color: Color(0xFF1E1E2C),
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Escolha um valor rápido ou digite manualmente.',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [5, 10, 20].map((option) {
-                    final selected = resultsLimit == option;
-                    return ChoiceChip(
-                      label: Text(
-                        '$option',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: selected ? Colors.white : const Color(0xFF374151),
-                        ),
-                      ),
-                      selected: selected,
-                      onSelected: (_) => onLimitChanged(option),
-                      backgroundColor: Colors.grey.shade100,
-                      selectedColor: const Color(0xFF1E1E2C),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      side: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999)),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: limitController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: false),
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
-                    labelText: 'Quantidade de precedentes',
-                    hintText: 'Ex.: 15',
-                    prefixIcon: const Icon(Icons.numbers_rounded),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF1E1E2C)),
-                    ),
-                    errorText: limitError,
-                  ),
-                  onChanged: (_) => onLimitErrorClear(),
-                  onSubmitted: (value) {
-                    final parsed = int.tryParse(value.trim());
-                    if (parsed != null && parsed > 0 && parsed <= 20) {
-                      onLimitChanged(parsed);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Upload PDF
-          GestureDetector(
-            onTap: onPickFile,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+            // ── Filtro de precedentes ──
+            Container(
               width: double.infinity,
-              height: 140,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: hasFile ? _primary : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: hasFile ? _primary : Colors.grey.shade300,
-                ),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    hasFile ? Icons.picture_as_pdf : Icons.upload_file,
-                    size: 40,
-                    color: hasFile ? Colors.white : Colors.grey,
+                  Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.filter_list_rounded,
+                          size: 18,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Quantidade de precedentes',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: Color(0xFF1E1E2C),
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Escolha um valor rápido ou digite manualmente.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    selectedFile?.name ?? 'Toque para selecionar um PDF',
-                    style: TextStyle(
-                      color: hasFile ? Colors.white : Colors.grey,
-                      fontWeight:
-                          hasFile ? FontWeight.w500 : FontWeight.normal,
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [5, 10, 20].map((option) {
+                      final selected = resultsLimit.value == option;
+                      return ChoiceChip(
+                        label: Text(
+                          '$option',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: selected
+                                ? Colors.white
+                                : const Color(0xFF374151),
+                          ),
+                        ),
+                        selected: selected,
+                        onSelected: (_) {
+                          resultsLimit.value = option;
+                          limitController.text = option.toString();
+                          limitError.value = null;
+                        },
+                        backgroundColor: Colors.grey.shade100,
+                        selectedColor: const Color(0xFF1E1E2C),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: limitController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: false,
                     ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      labelText: 'Quantidade de precedentes',
+                      hintText: 'Ex.: 15',
+                      prefixIcon: const Icon(Icons.numbers_rounded),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF1E1E2C)),
+                      ),
+                      errorText: limitError.value,
+                    ),
+                    onChanged: (_) {
+                      if (limitError.value != null) {
+                        limitError.value = null;
+                      }
+                    },
+                    onSubmitted: (value) {
+                      final parsed = int.tryParse(value.trim());
+                      if (parsed != null && parsed > 0 && parsed <= 20) {
+                        resultsLimit.value = parsed;
+                        limitError.value = null;
+                      }
+                    },
                   ),
                 ],
               ),
             ),
-          ),
 
-          const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: onSubmit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+            // ── Conteúdo da aba ──
+            if (!isJudge && activeTab.value == 1)
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: TextField(
+                    controller: textController,
+                    maxLines: null,
+                    expands: true,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: const InputDecoration(
+                      hintText: 'Cole aqui o texto completo da petição...',
+                      hintStyle: TextStyle(color: Colors.grey),
+                      contentPadding: EdgeInsets.all(16),
+                      border: InputBorder.none,
+                    ),
+                    style: const TextStyle(fontSize: 14, height: 1.5),
+                  ),
+                ),
+              )
+            else
+              // Upload PDF
+              GestureDetector(
+                onTap: upload.isSubmitting ? null : upload.pickPDF,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: double.infinity,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    color: hasFile ? _primary : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: hasFile ? _primary : Colors.grey.shade300,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        hasFile ? Icons.picture_as_pdf : Icons.upload_file,
+                        size: 40,
+                        color: hasFile ? Colors.white : Colors.grey,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        upload.selectedFile?.name ??
+                            'Toque para selecionar um PDF',
+                        style: TextStyle(
+                          color: hasFile ? Colors.white : Colors.grey,
+                          fontWeight: hasFile
+                              ? FontWeight.w500
+                              : FontWeight.normal,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Analisar Processo',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward, size: 18),
-                ],
+
+            const SizedBox(height: 20),
+
+            // ── Botão Enviar ──
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: upload.isSubmitting ? null : onSubmit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: upload.isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(buttonLabel,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600)),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.arrow_forward, size: 18),
+                        ],
+                      ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-// ─── Formulário do Advogado (Nova Petição: texto + PDF opcional + filtro órgão) ─
+// ─── TabBar (Advogado: PDF | Texto) ──────────────────────────────────────────
 
-class _LawyerForm extends StatelessWidget {
-  final TextEditingController textController;
-  final String? selectedOrgao;
-  final PlatformFile? attachedFile;
-  final void Function(String?) onOrgaoChanged;
-  final VoidCallback onAttachFile;
-  final VoidCallback onRemoveFile;
-  final Future<void> Function() onSubmit;
+class _TabBar extends StatelessWidget {
+  final int activeIndex;
+  final void Function(int) onTabChanged;
 
-  const _LawyerForm({
-    required this.textController,
-    required this.selectedOrgao,
-    required this.attachedFile,
-    required this.onOrgaoChanged,
-    required this.onAttachFile,
-    required this.onRemoveFile,
-    required this.onSubmit,
-  });
-
-  static const Color _primary = Color(0xFF1D2A7A);
+  const _TabBar({required this.activeIndex, required this.onTabChanged});
 
   @override
   Widget build(BuildContext context) {
-    final hasFile = attachedFile != null;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Nova Petição',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E1E2C),
-            ),
+    return Row(
+      children: [
+        Expanded(
+          child: _TabCard(
+            label: 'Upload PDF',
+            subtitle: 'Enviar petição em PDF',
+            icon: Icons.picture_as_pdf_outlined,
+            isActive: activeIndex == 0,
+            onTap: () => onTabChanged(0),
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'Descreva o caso e gere uma petição completa com precedentes',
-            style: TextStyle(color: Colors.grey, fontSize: 14),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _TabCard(
+            label: 'Colar Texto',
+            subtitle: 'Digitar ou colar petição',
+            icon: Icons.content_paste_rounded,
+            isActive: activeIndex == 1,
+            onTap: () => onTabChanged(1),
           ),
-          const SizedBox(height: 20),
+        ),
+      ],
+    );
+  }
+}
 
-          // Descrição do caso
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            constraints: const BoxConstraints(minHeight: 140),
-            child: TextField(
-              controller: textController,
-              maxLines: null,
-              minLines: 6,
-              textAlignVertical: TextAlignVertical.top,
-              decoration: const InputDecoration(
-                hintText:
-                    'Descreva o caso jurídico em detalhes...\n\nEx: Meu cliente foi demitido sem justa causa após 5 anos de empresa. Não recebeu aviso prévio e as verbas rescisórias foram pagas com atraso...',
-                hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
-                contentPadding: EdgeInsets.all(16),
-                border: InputBorder.none,
-              ),
-              style: const TextStyle(fontSize: 14, height: 1.5),
-            ),
-          ),
-          const SizedBox(height: 12),
+class _TabCard extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  final IconData icon;
+  final bool isActive;
+  final VoidCallback onTap;
 
-          // Label + nota sobre o PDF
-          const Text(
-            'Documento anexo',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1E1E2C),
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Opcional — porém, para fornecer contexto adicional ao caso e gerar a minuta (contrato, correspondência, etc.), você pode anexar um PDF.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF74839A), height: 1.4),
-          ),
-          const SizedBox(height: 8),
+  const _TabCard({
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+    required this.isActive,
+    required this.onTap,
+  });
 
-          // Anexar PDF (opcional)
-          GestureDetector(
-            onTap: hasFile ? null : onAttachFile,
-            child: AnimatedContainer(
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isActive ? const Color(0xFF1D2A7A) : Colors.grey.shade200,
+            width: isActive ? 2.0 : 1.0,
+          ),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF1D2A7A).withOpacity(0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+        ),
+        child: Row(
+          children: [
+            AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: hasFile
-                    ? _primary.withOpacity(0.06)
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: hasFile ? _primary : Colors.grey.shade300,
-                ),
+                color: isActive
+                    ? const Color(0xFF1D2A7A).withOpacity(0.08)
+                    : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    hasFile ? Icons.picture_as_pdf : Icons.attach_file_rounded,
-                    size: 22,
-                    color: hasFile ? _primary : Colors.grey.shade500,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      hasFile
-                          ? attachedFile!.name
-                          : 'Anexar PDF (opcional)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: hasFile ? _primary : Colors.grey.shade600,
-                        fontWeight: hasFile ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (hasFile)
-                    GestureDetector(
-                      onTap: onRemoveFile,
-                      child: Icon(Icons.close_rounded,
-                          size: 18, color: Colors.grey.shade500),
-                    )
-                  else
-                    Icon(Icons.chevron_right,
-                        size: 18, color: Colors.grey.shade400),
-                ],
+              child: Icon(
+                icon,
+                size: 20,
+                color: isActive ? const Color(0xFF1D2A7A) : Colors.grey.shade400,
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-
-          // Filtro por órgão
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String?>(
-                value: selectedOrgao,
-                isExpanded: true,
-                hint: const Text(
-                  'Filtrar por órgão (opcional)',
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
-                ),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('Todos os órgãos',
-                        style: TextStyle(fontSize: 13)),
-                  ),
-                  ..._orgaoOptions.map(
-                    (o) => DropdownMenuItem<String?>(
-                      value: o,
-                      child: Text(o, style: const TextStyle(fontSize: 13)),
-                    ),
-                  ),
-                ],
-                onChanged: onOrgaoChanged,
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: onSubmit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Row(
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Gerar Petição',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  SizedBox(width: 8),
-                  Icon(Icons.auto_awesome_rounded, size: 18),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isActive ? const Color(0xFF1E1E2C) : Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isActive ? Colors.grey.shade500 : Colors.grey.shade400,
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -838,7 +669,7 @@ class _LoadingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 28),
                   Text(
-                    isJudge ? 'Analisando processo...' : 'Gerando petição...',
+                    isJudge ? 'Analisando processo...' : 'Analisando petição...',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
@@ -846,6 +677,7 @@ class _LoadingScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  // Barra de progresso
                   Container(
                     width: 220,
                     height: 6,

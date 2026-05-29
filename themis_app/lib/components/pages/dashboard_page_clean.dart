@@ -4,7 +4,6 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import '../ui/app_bar.dart';
 import '../../hooks/use_history_controller.dart';
 import '../../lib/models.dart';
-import '../../lib/profile_mode.dart';
 
 class DashboardPage extends HookWidget {
   final VoidCallback onNewAnalysis;
@@ -26,7 +25,7 @@ class DashboardPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final history = useHistoryController(token: token, profileMode: ProfileMode.judge);
+    final history = useHistoryController(token: token);
     final completedCount = history.entries.length;
 
     return Scaffold(

@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../../hooks/use_history_controller.dart';
 import '../../lib/models.dart';
-import '../../lib/profile_mode.dart';
 import '../ui/app_bar.dart';
 
 class CaseHistoryPage extends HookWidget {
@@ -24,7 +23,7 @@ class CaseHistoryPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final history = useHistoryController(token: token, profileMode: ProfileMode.judge);
+    final history = useHistoryController(token: token);
 
     return Scaffold(
       backgroundColor: _background,
