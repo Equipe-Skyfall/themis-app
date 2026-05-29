@@ -54,36 +54,6 @@ class CaseAnalysisApiService {
       throw const CaseAnalysisApiException('Quantidade de precedentes inválida.');
     }
 
-    // Step 0: Dispara a rota antiga em background para forçar a atualização do histórico
-    try {
-      final historyRequest = http.MultipartRequest(
-        'POST',
-        _uri('/petition/analyze'),
-      );
-      historyRequest.headers['Authorization'] = 'Bearer $token';
-      historyRequest.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          pdfBytes,
-          filename: fileName,
-          contentType: MediaType('application', 'pdf'),
-        ),
-      );
-
-      _httpClient
-          .send(historyRequest)
-          .catchError((_) => http.StreamedResponse(const Stream.empty(), 500));
-      if (kDebugMode) {
-        debugPrint(
-          '[CaseAnalysisAPI] Disparado envio em background para /petition/analyze (para histórico)',
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('[CaseAnalysisAPI] Erro ao disparar background para histórico: $e');
-      }
-    }
-
     // Step 1: Envia o PDF para /petition/analyze-case e recebe job_id
     onStatusUpdate?.call('Enviando processo para análise...');
     final jobId = await _analyzeCase(token, fileName, pdfBytes);

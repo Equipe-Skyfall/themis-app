@@ -10,6 +10,7 @@ import 'components/pages/settings_page.dart';
 import 'components/pages/results_page.dart';
 import 'components/pages/upload_pdf_screen.dart';
 import 'components/pages/case_history_page.dart';
+import 'components/pages/petition_result_page.dart';
 import 'lib/models.dart';
 import 'lib/profile_mode.dart';
 
@@ -56,6 +57,12 @@ class AppController extends HookWidget {
     final selectedSummary = useState<String?>(null);
     final selectedAnalysisData = useState<Map<String, dynamic>?>(null);
 
+    // Resultado de geração de petição (Frente 1 — advogado)
+    final petitionText = useState<String?>(null);
+    final petitionCaseDescription = useState<String?>(null);
+    final petitionPrecedents = useState<List<Precedent>>([]);
+    final petitionWeakPrecedents = useState(false);
+
     // ── Auth ─────────────────────────────────────────────────────────────────
     if (auth.session == null) {
       return AuthPage(onLogin: auth.login, onRegister: auth.register);
@@ -93,6 +100,30 @@ class AppController extends HookWidget {
           selectedSummary.value = summary;
           selectedAnalysisData.value = analysisData;
           isInUpload.value = false;
+        },
+        onPetitionGenerated: (text, description, precedents, weakPrecedents) {
+          petitionText.value = text;
+          petitionCaseDescription.value = description;
+          petitionPrecedents.value = precedents;
+          petitionWeakPrecedents.value = weakPrecedents;
+          isInUpload.value = false;
+        },
+      );
+    }
+
+    // ── Resultado de petição gerada (Frente 1 — sem navbar) ──────────────────
+    if (petitionText.value != null) {
+      return PetitionResultPage(
+        initialPetitionText: petitionText.value!,
+        caseDescription: petitionCaseDescription.value ?? '',
+        initialPrecedents: petitionPrecedents.value,
+        initialWeakPrecedents: petitionWeakPrecedents.value,
+        token: auth.session?.token,
+        onBack: () {
+          petitionText.value = null;
+          petitionCaseDescription.value = null;
+          petitionPrecedents.value = [];
+          petitionWeakPrecedents.value = false;
         },
       );
     }
@@ -144,6 +175,15 @@ class AppController extends HookWidget {
       onLogout: () => auth.logout(),
       onOpenSettings: () => isInSettings.value = true,
       onSelectHistory: (entry) {
+        // Frente 1 (Advogado): abre PetitionResultPage com o texto da petição
+        if (entry.petitionText != null && entry.petitionText!.isNotEmpty) {
+          petitionText.value = entry.petitionText;
+          petitionCaseDescription.value = entry.caseDescription ?? '';
+          petitionPrecedents.value = entry.precedents;
+          petitionWeakPrecedents.value = entry.weakPrecedents;
+          return;
+        }
+        // Frente 2 (Juiz): abre ResultsPage com precedentes e minuta
         selectedCase.value = CaseHistory(
           id: entry.id,
           title: entry.filename,

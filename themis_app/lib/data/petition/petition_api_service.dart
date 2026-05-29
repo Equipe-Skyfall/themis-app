@@ -439,16 +439,16 @@ class PetitionApiService {
         .toList();
   }
 
-  /// Fetches the case analysis history for the Judge front.
-  /// Calls GET /petition/case-analysis-history.
-  Future<List<Map<String, dynamic>>> fetchCaseAnalysisHistory({
+  /// Fetches the generated petitions history for the Lawyer front (Frente 1).
+  /// Calls GET /petition/generated-history.
+  Future<List<Map<String, dynamic>>> fetchGeneratedHistory({
     required String token,
   }) async {
     _assertConfigured();
 
     final response = await _httpClient
         .get(
-          _uri('/petition/case-analysis-history'),
+          _uri('/petition/generated-history'),
           headers: {'Authorization': 'Bearer $token'},
         )
         .timeout(const Duration(seconds: 30));
@@ -471,6 +471,163 @@ class PetitionApiService {
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
+  }
+
+  /// Generates a petition from a case description.
+  /// 1. POST /petition/generate → job_id
+  /// 2. Polls /petition/case-status/{job_id} until done
+  /// 3. Returns petition text
+  Future<Map<String, dynamic>> generatePetitionWithPolling({
+    required String token,
+    required String caseDescription,
+    String? orgaoFilter,
+    Uint8List? pdfBytes,
+    String? pdfFileName,
+    Function(String)? onStatusUpdate,
+  }) async {
+    _assertConfigured();
+
+    onStatusUpdate?.call('Iniciando geração da petição...');
+
+    final request = http.MultipartRequest('POST', _uri('/petition/generate'));
+    request.headers['Authorization'] = 'Bearer $token';
+    request.fields['case_description'] = caseDescription;
+    if (orgaoFilter != null && orgaoFilter.isNotEmpty) {
+      request.fields['orgao_filter'] = orgaoFilter;
+    }
+    if (pdfBytes != null && pdfFileName != null && pdfBytes.isNotEmpty) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          pdfBytes,
+          filename: pdfFileName,
+          contentType: MediaType('application', 'pdf'),
+        ),
+      );
+    }
+
+    if (kDebugMode) {
+      debugPrint('[API] POST /petition/generate — orgao_filter=$orgaoFilter');
+    }
+
+    final streamedResponse =
+        await _httpClient.send(request).timeout(const Duration(minutes: 5));
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (kDebugMode) {
+      debugPrint('[API] generate status: ${response.statusCode}');
+      debugPrint('[API] generate body: ${response.body}');
+    }
+
+    if (!_isSuccess(response.statusCode)) {
+      throw PetitionApiException(
+        _errorMessage(response),
+        statusCode: response.statusCode,
+        responseBody: response.body,
+      );
+    }
+
+    final parsed = _decodeBody(response.body);
+    final jobId = parsed?['job_id'] as String?;
+    if (jobId == null || jobId.isEmpty) {
+      throw const PetitionApiException('Job ID não retornado pelo servidor.');
+    }
+
+    if (kDebugMode) debugPrint('[API] Job ID (generate): $jobId');
+
+    onStatusUpdate?.call('Gerando petição... (etapa 1/3)');
+    final result = await _pollCaseStatus(token, jobId, onStatusUpdate);
+
+    return _formatPetitionResult(result);
+  }
+
+  /// Regenerates a petition given the current text and optional instructions.
+  /// 1. POST /petition/regenerate → job_id
+  /// 2. Polls /petition/case-status/{job_id} until done
+  /// 3. Returns new petition text
+  Future<Map<String, dynamic>> regeneratePetitionWithPolling({
+    required String token,
+    required String caseDescription,
+    String? petitionText,
+    String? instructions,
+    Function(String)? onStatusUpdate,
+  }) async {
+    _assertConfigured();
+
+    onStatusUpdate?.call('Regenerando petição...');
+
+    final body = <String, dynamic>{
+      'case_description': caseDescription,
+      if (petitionText != null && petitionText.isNotEmpty)
+        'petition_text': petitionText,
+      if (instructions != null && instructions.isNotEmpty)
+        'instructions': instructions,
+    };
+
+    if (kDebugMode) {
+      debugPrint('[API] POST /petition/regenerate');
+    }
+
+    final response = await _httpClient
+        .post(
+          _uri('/petition/regenerate'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(minutes: 5));
+
+    if (kDebugMode) {
+      debugPrint('[API] regenerate status: ${response.statusCode}');
+      debugPrint('[API] regenerate body: ${response.body}');
+    }
+
+    if (!_isSuccess(response.statusCode)) {
+      throw PetitionApiException(
+        _errorMessage(response),
+        statusCode: response.statusCode,
+        responseBody: response.body,
+      );
+    }
+
+    final parsed = _decodeBody(response.body);
+    final jobId = parsed?['job_id'] as String?;
+    if (jobId == null || jobId.isEmpty) {
+      throw const PetitionApiException('Job ID não retornado pelo servidor.');
+    }
+
+    if (kDebugMode) debugPrint('[API] Job ID (regenerate): $jobId');
+
+    final result = await _pollCaseStatus(token, jobId, onStatusUpdate);
+
+    return _formatPetitionResult(result);
+  }
+
+  /// Extracts petition text, precedents and weak_precedents flag from a polling result.
+  Map<String, dynamic> _formatPetitionResult(Map<String, dynamic> statusResult) {
+    final result = statusResult['result'] as Map<String, dynamic>? ?? statusResult;
+
+    final petitionText = result['petition_text'] as String?
+        ?? result['petition'] as String?
+        ?? result['text'] as String?
+        ?? result['minuta'] as String?
+        ?? '';
+
+    final precedentResults =
+        (result['precedent_results'] as List<dynamic>? ?? [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+
+    final weakPrecedents = result['weak_precedents'] as bool? ?? false;
+
+    return {
+      'petition_text': petitionText,
+      'precedent_results': precedentResults,
+      'weak_precedents': weakPrecedents,
+    };
   }
 
   Uri _uri(String path) => Uri.parse('$_baseUrl$path');

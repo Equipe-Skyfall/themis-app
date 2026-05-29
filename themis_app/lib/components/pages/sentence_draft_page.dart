@@ -4,6 +4,7 @@ import '../ui/app_bar.dart';
 import '../ui/footer_navbar.dart';
 import '../../hooks/use_history_controller.dart';
 import '../../lib/models.dart';
+import '../../lib/profile_mode.dart';
 import '../../services/sentence_draft_pdf_service.dart';
 
 class SentenceDraftPage extends HookWidget {
@@ -20,7 +21,7 @@ class SentenceDraftPage extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final history = useHistoryController(token: token);
+    final history = useHistoryController(token: token, profileMode: ProfileMode.judge);
     final selectedEntry = useState<HistoryEntry?>(null);
     final isExporting = useState(false);
 
