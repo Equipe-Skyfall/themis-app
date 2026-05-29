@@ -80,6 +80,19 @@ class _PetitionResultPageState extends State<PetitionResultPage> {
       _precedents.isNotEmpty &&
       !_precedents.any((p) => _normalizeStatus(p.status) == 'applicable');
 
+  void _openExportSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ExportSelectionSheet(
+        petitionText: _petitionText,
+        caseDescription: widget.caseDescription,
+        precedents: _precedents,
+      ),
+    );
+  }
+
   void _openPetitionSheet() {
     showModalBottomSheet(
       context: context,
@@ -359,6 +372,34 @@ class _PetitionResultPageState extends State<PetitionResultPage> {
                         ),
                       );
                     }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: _precedents.isEmpty ? null : _openExportSheet,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primary,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: _primary.withValues(alpha: 0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.download_rounded, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Exportar para PDF',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -1149,4 +1190,403 @@ String? _pickFirstText(Map<String, dynamic> source, List<String> keys) {
     if (value is String && value.trim().isNotEmpty) return value.trim();
   }
   return null;
+}
+
+// ─── Sheet: Seleção para Exportar PDF Completo ───────────────────────────────
+
+class _ExportSelectionSheet extends StatefulWidget {
+  final String petitionText;
+  final String caseDescription;
+  final List<Precedent> precedents;
+
+  const _ExportSelectionSheet({
+    required this.petitionText,
+    required this.caseDescription,
+    required this.precedents,
+  });
+
+  @override
+  State<_ExportSelectionSheet> createState() => _ExportSelectionSheetState();
+}
+
+class _ExportSelectionSheetState extends State<_ExportSelectionSheet> {
+  static const _primary = Color(0xFF1D2A7A);
+
+  // Categorias de aplicabilidade disponíveis
+  static final _categories = [
+    _ApplicabilityCategory(
+      status: 'applicable',
+      label: 'Aplicável',
+      color: const Color(0xFF4CAF50),
+    ),
+    _ApplicabilityCategory(
+      status: 'possibly_applicable',
+      label: 'Possivelmente Aplicável',
+      color: const Color(0xFFF9A825),
+    ),
+    _ApplicabilityCategory(
+      status: 'not_applicable',
+      label: 'Não Aplicável',
+      color: const Color(0xFFD94841),
+    ),
+  ];
+
+  late bool _includePetition;
+  late Set<String> _selectedStatuses;
+  bool _isExporting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _includePetition = widget.petitionText.trim().isNotEmpty;
+    // Seleciona por padrão apenas as categorias que têm ao menos 1 precedente
+    _selectedStatuses = _categories
+        .where((c) => _countForStatus(c.status) > 0)
+        .map((c) => c.status)
+        .toSet();
+  }
+
+  int _countForStatus(String status) => widget.precedents
+      .where((p) => _normalizeStatus(p.status) == status)
+      .length;
+
+  String _normalizeStatus(String s) =>
+      s == 'preliminary' ? 'possibly_applicable' : s;
+
+  List<Precedent> get _selectedPrecedents => widget.precedents
+      .where((p) => _selectedStatuses.contains(_normalizeStatus(p.status)))
+      .toList();
+
+  Future<void> _export() async {
+    final selected = _selectedPrecedents
+        .map((p) => PrecedentExportData(precedent: p, includeTese: true))
+        .toList();
+
+    if (!_includePetition && selected.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Selecione ao menos a petição ou uma categoria de precedentes.')),
+      );
+      return;
+    }
+
+    setState(() => _isExporting = true);
+    try {
+      final path = await PDFExportService.exportComprehensivePetitionPdf(
+        caseDescription: widget.caseDescription,
+        petitionText: _includePetition ? widget.petitionText : null,
+        precedents: selected,
+      );
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF salvo: ${path.split(Platform.pathSeparator).last}'),
+            backgroundColor: const Color(0xFF4CAF50),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isExporting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao exportar: $e'),
+            backgroundColor: const Color(0xFFD94841),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalSelected = _selectedPrecedents.length;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.5,
+      maxChildSize: 0.92,
+      builder: (ctx, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 4),
+              child: Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 8, 12),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Exportar PDF Completo',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1E2C),
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Selecione o que incluir no relatório',
+                          style: TextStyle(fontSize: 12, color: Color(0xFF74839A)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Color(0xFF74839A)),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Toggle: Petição ──
+                    if (widget.petitionText.trim().isNotEmpty) ...[
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: SwitchListTile(
+                          value: _includePetition,
+                          onChanged: (v) => setState(() => _includePetition = v),
+                          activeTrackColor: _primary,
+                          title: const Text(
+                            'Incluir Petição Gerada',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1E1E2C),
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Texto completo da petição em Markdown',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF74839A)),
+                          ),
+                          secondary: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: _primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.article_rounded, color: _primary, size: 20),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // ── Filtro por aplicabilidade ──
+                    const Text(
+                      'Precedentes por aplicabilidade',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E1E2C),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$totalSelected de ${widget.precedents.length} precedentes selecionados',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Chips de categoria
+                    ...(_categories.map((cat) {
+                      final count = _countForStatus(cat.status);
+                      final isOn = _selectedStatuses.contains(cat.status);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          onTap: count == 0
+                              ? null
+                              : () => setState(() {
+                                    if (isOn) {
+                                      _selectedStatuses.remove(cat.status);
+                                    } else {
+                                      _selectedStatuses.add(cat.status);
+                                    }
+                                  }),
+                          borderRadius: BorderRadius.circular(12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: count == 0
+                                  ? Colors.grey[50]
+                                  : isOn
+                                      ? cat.color.withValues(alpha: 0.08)
+                                      : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: count == 0
+                                    ? Colors.grey[200]!
+                                    : isOn
+                                        ? cat.color
+                                        : Colors.grey[300]!,
+                                width: isOn ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    color: count == 0
+                                        ? Colors.grey[300]
+                                        : isOn
+                                            ? cat.color
+                                            : cat.color.withValues(alpha: 0.3),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    cat.label,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: count == 0
+                                          ? Colors.grey[400]
+                                          : isOn
+                                              ? const Color(0xFF1E1E2C)
+                                              : Colors.grey[500],
+                                    ),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: count == 0
+                                        ? Colors.grey[100]
+                                        : isOn
+                                            ? cat.color.withValues(alpha: 0.15)
+                                            : Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '$count',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: count == 0
+                                          ? Colors.grey[400]
+                                          : isOn
+                                              ? cat.color
+                                              : Colors.grey[500],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  isOn && count > 0
+                                      ? Icons.check_circle_rounded
+                                      : Icons.radio_button_unchecked_rounded,
+                                  color: count == 0
+                                      ? Colors.grey[300]
+                                      : isOn
+                                          ? cat.color
+                                          : Colors.grey[400],
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    })),
+
+                    const SizedBox(height: 28),
+
+                    // ── Botão Exportar ──
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: _isExporting ? null : _export,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: _primary.withValues(alpha: 0.5),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
+                        icon: _isExporting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.download_rounded, size: 20),
+                        label: Text(
+                          _isExporting ? 'Exportando...' : 'Exportar para PDF',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 15),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ApplicabilityCategory {
+  final String status;
+  final String label;
+  final Color color;
+
+  _ApplicabilityCategory({
+    required this.status,
+    required this.label,
+    required this.color,
+  });
 }
