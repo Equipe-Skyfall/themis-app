@@ -191,112 +191,14 @@ class _ResultsPageState extends State<ResultsPage> {
 
   void _showMinutaBottomSheet(BuildContext context) {
     final minuta = widget.analysisData?['minuta'] ?? '';
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-          ),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Minuta de Sentença',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E1E2C),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => _exportMinutaToPdf(minuta),
-                          icon: const Icon(Icons.download_rounded),
-                          tooltip: 'Download PDF',
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.all(20),
-                  child: MarkdownBody(
-                    data: minuta,
-                    styleSheet: MarkdownStyleSheet(
-                      h1: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E1E2C),
-                      ),
-                      h2: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1D2A7A),
-                      ),
-                      h3: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1E1E2C),
-                      ),
-                      p: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF3A3A4A),
-                        height: 1.6,
-                      ),
-                      strong: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E1E2C),
-                      ),
-                      em: const TextStyle(
-                        fontStyle: FontStyle.italic,
-                        color: Color(0xFF3A3A4A),
-                      ),
-                      code: TextStyle(
-                        backgroundColor: Colors.grey[100],
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        color: Colors.grey[800],
-                      ),
-                      blockquote: TextStyle(
-                        color: Colors.grey[600],
-                        fontStyle: FontStyle.italic,
-                      ),
-                      listBullet: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF3A3A4A),
-                        height: 1.6,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+      builder: (context) => _MinutaBottomSheet(
+        initialMinuta: minuta,
+        onExport: _exportMinutaToPdf,
       ),
     );
   }
@@ -518,6 +420,211 @@ class _ResultsPageState extends State<ResultsPage> {
     }
   }
 
+  static const Map<String, String> _docTypeLabels = {
+    'peticao_inicial': 'Petição Inicial',
+    'contestacao': 'Contestação',
+    'replica': 'Réplica',
+    'sentenca': 'Sentença',
+    'apelacao': 'Apelação',
+    'contrarrazoes': 'Contrarrazões',
+  };
+
+  static const Map<String, Color> _docTypeColors = {
+    'peticao_inicial': Color(0xFF1D2A7A),
+    'contestacao': Color(0xFFD94841),
+    'replica': Color(0xFFF9A825),
+    'sentenca': Color(0xFF4CAF50),
+    'apelacao': Color(0xFF7B1FA2),
+    'contrarrazoes': Color(0xFF607D8B),
+  };
+
+  Widget _buildDocumentsSection(Map<String, dynamic> analysisData) {
+    final rawDocs = analysisData['documents'];
+    if (rawDocs is! List || rawDocs.isEmpty) return const SizedBox.shrink();
+
+    final docs = rawDocs.whereType<Map>().toList();
+    if (docs.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'PEÇAS PROCESSUAIS IDENTIFICADAS',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1D2A7A),
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...docs.asMap().entries.map((entry) {
+              final i = entry.key;
+              final doc = Map<String, dynamic>.from(entry.value);
+              final type = (doc['type'] ?? '').toString();
+              final title = (doc['title'] ?? '').toString();
+              final startPage = doc['start_page'];
+              final endPage = doc['end_page'];
+              final summary = (doc['summary'] ?? '').toString();
+              final label = _docTypeLabels[type] ?? type;
+              final color = _docTypeColors[type] ?? const Color(0xFF607D8B);
+
+              return Column(
+                children: [
+                  if (i > 0)
+                    Divider(height: 20, color: Colors.grey[100]),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (startPage != null && endPage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            'Págs. $startPage–$endPage',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[500],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (title.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E1E2C),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (summary.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      summary,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        height: 1.4,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPetitionSummaryCard(String petitionSummary) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 5,
+              decoration: const BoxDecoration(
+                color: Color(0xFF4CAF50),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'RESUMO DA PETIÇÃO INICIAL',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF2E7D32),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      petitionSummary,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF3A3A4A),
+                        height: 1.55,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final visiblePrecedents = _visiblePrecedents;
@@ -615,8 +722,22 @@ class _ResultsPageState extends State<ResultsPage> {
                 ),
               ),
 
+            // ── PEÇAS PROCESSUAIS ──
+            if (widget.analysisData != null)
+              _buildDocumentsSection(widget.analysisData!),
+
+            // ── RESUMO DA PETIÇÃO INICIAL ──
+            if (widget.analysisData != null &&
+                widget.analysisData!['petition_summary'] is String &&
+                (widget.analysisData!['petition_summary'] as String).trim().isNotEmpty)
+              _buildPetitionSummaryCard(
+                widget.analysisData!['petition_summary'] as String,
+              ),
+
             // ── MINUTA DE SENTENÇA ──
-            if (widget.analysisData != null && widget.analysisData!['minuta'] != null)
+            if (widget.analysisData != null &&
+                widget.analysisData!['minuta'] is String &&
+                (widget.analysisData!['minuta'] as String).trim().isNotEmpty)
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(bottom: 20),
@@ -862,6 +983,207 @@ class _ResultsPageState extends State<ResultsPage> {
     );
   }
 }
+
+// ─── Minuta Bottom Sheet com edição ──────────────────────────────────────────
+
+class _MinutaBottomSheet extends StatefulWidget {
+  final String initialMinuta;
+  final Future<void> Function(String) onExport;
+
+  const _MinutaBottomSheet({
+    required this.initialMinuta,
+    required this.onExport,
+  });
+
+  @override
+  State<_MinutaBottomSheet> createState() => _MinutaBottomSheetState();
+}
+
+class _MinutaBottomSheetState extends State<_MinutaBottomSheet> {
+  bool _isEditing = false;
+  late TextEditingController _textController;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: widget.initialMinuta);
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  String get _currentText => _textController.text;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            // ── Cabeçalho ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Minuta de Sentença',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1E2C),
+                          ),
+                        ),
+                        if (_isEditing)
+                          const Text(
+                            'Modo edição — altere o texto antes de exportar',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFFF9A825),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      setState(() => _isEditing = !_isEditing);
+                    },
+                    icon: Icon(
+                      _isEditing ? Icons.visibility_rounded : Icons.edit_rounded,
+                      color: _isEditing
+                          ? const Color(0xFF1D2A7A)
+                          : Colors.grey[600],
+                    ),
+                    tooltip: _isEditing ? 'Visualizar' : 'Editar',
+                  ),
+                  IconButton(
+                    onPressed: () => widget.onExport(_currentText),
+                    icon: const Icon(Icons.download_rounded),
+                    tooltip: 'Download PDF',
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // ── Conteúdo ──
+            Expanded(
+              child: _isEditing
+                  ? Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextField(
+                        controller: _textController,
+                        maxLines: null,
+                        expands: true,
+                        textAlignVertical: TextAlignVertical.top,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF1E1E2C),
+                          height: 1.6,
+                          fontFamily: 'monospace',
+                        ),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                          contentPadding: const EdgeInsets.all(14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF1D2A7A),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(20),
+                      child: MarkdownBody(
+                        data: _currentText,
+                        styleSheet: MarkdownStyleSheet(
+                          h1: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1E2C),
+                          ),
+                          h2: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1D2A7A),
+                          ),
+                          h3: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E1E2C),
+                          ),
+                          p: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF3A3A4A),
+                            height: 1.6,
+                          ),
+                          strong: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1E2C),
+                          ),
+                          em: const TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFF3A3A4A),
+                          ),
+                          code: TextStyle(
+                            backgroundColor: Colors.grey[100],
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            color: Colors.grey[800],
+                          ),
+                          blockquote: TextStyle(
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                          listBullet: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF3A3A4A),
+                            height: 1.6,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ApplicabilityFilterOption {
   final String status;
