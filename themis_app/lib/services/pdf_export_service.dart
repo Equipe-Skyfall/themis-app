@@ -17,6 +17,140 @@ class PDFExportService {
   static const _primaryLight = PdfColor.fromInt(0xFFF0F2FF); // Azul muito claro
   static const _borderColor = PdfColor.fromInt(0xFFE0E0E0);
 
+  /// Exporta a petição gerada (Frente 1) para PDF com header THEMIS e formatação completa.
+  static Future<String> exportPetitionToPdf({
+    required String petitionText,
+    required String caseDescription,
+  }) async {
+    final cleanText = _sanitizeForPdf(petitionText);
+    final cleanDesc = _sanitizeForPdf(caseDescription);
+
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 36, vertical: 40),
+        header: (_) => pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: pw.BoxDecoration(
+                color: _primaryColor,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    'THEMIS',
+                    style: pw.TextStyle(
+                      fontSize: 22,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.white,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text(
+                    'Assistente Juridico - Peticao Gerada',
+                    style: const pw.TextStyle(fontSize: 10, color: PdfColors.white),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 14),
+            if (cleanDesc.trim().isNotEmpty) ...[
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(12),
+                decoration: const pw.BoxDecoration(
+                  border: pw.Border(
+                    left: pw.BorderSide(color: _primaryColor, width: 4),
+                  ),
+                  color: PdfColor.fromInt(0xFFF5F7FF),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'DESCRICAO DO CASO',
+                      style: pw.TextStyle(
+                        fontSize: 9,
+                        fontWeight: pw.FontWeight.bold,
+                        color: _primaryColor,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    pw.SizedBox(height: 6),
+                    pw.Text(
+                      cleanDesc,
+                      style: const pw.TextStyle(
+                        fontSize: 10,
+                        height: 1.4,
+                        color: PdfColor.fromInt(0xFF3A3A4A),
+                      ),
+                      maxLines: 4,
+                      overflow: pw.TextOverflow.clip,
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 14),
+            ],
+            pw.Divider(color: _borderColor),
+            pw.SizedBox(height: 10),
+          ],
+        ),
+        footer: (context) => pw.Container(
+          margin: const pw.EdgeInsets.only(top: 12),
+          padding: const pw.EdgeInsets.only(top: 8),
+          decoration: pw.BoxDecoration(
+            border: pw.Border(top: pw.BorderSide(color: _borderColor)),
+          ),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'Gerado pelo Themis — Assistente Juridico',
+                style: pw.TextStyle(fontSize: 8, color: _greyColor),
+              ),
+              pw.Text(
+                'Pagina ${context.pageNumber} de ${context.pagesCount}',
+                style: pw.TextStyle(fontSize: 8, color: _greyColor),
+              ),
+            ],
+          ),
+        ),
+        build: (context) {
+          final paragraphs = cleanText.split('\n');
+          return paragraphs.map((p) {
+            if (p.trim().isEmpty) return pw.SizedBox(height: 8);
+            return _buildMarkdownParagraph(p);
+          }).toList();
+        },
+      ),
+    );
+
+    final pdfBytes = await pdf.save();
+    final fileName =
+        'Themis_Peticao_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final downloadsDir = await getDownloadsDirectory();
+    final defaultPath =
+        downloadsDir?.path ?? (await getApplicationDocumentsDirectory()).path;
+
+    final selectedPath = await _showSaveDialog(fileName, defaultPath);
+    if (selectedPath == null) {
+      throw Exception('Salvamento cancelado pelo usuario');
+    }
+
+    final file = File(selectedPath);
+    await file.writeAsBytes(pdfBytes);
+    return selectedPath;
+  }
+
   static Future<String> exportMinutaToPdf(String minuta) async {
     // Comprehensive sanitization for PDF font compatibility
     var cleanText = _sanitizeForPdf(minuta);

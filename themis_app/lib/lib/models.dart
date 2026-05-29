@@ -50,6 +50,9 @@ class HistoryEntry {
   final DateTime timestamp;
   final String? summary;
   final List<Precedent> precedents;
+  final String? petitionText;
+  final String? caseDescription;
+  final bool weakPrecedents;
 
   HistoryEntry({
     required this.id,
@@ -57,5 +60,8 @@ class HistoryEntry {
     required this.timestamp,
     this.summary,
     required this.precedents,
+    this.petitionText,
+    this.caseDescription,
+    this.weakPrecedents = false,
   });
 }
