@@ -134,7 +134,7 @@ class CaseAnalysisApiService {
     String jobId,
     Function(String)? onStatusUpdate,
   ) async {
-    const maxAttempts = 120; // 2 minutes max (1 second interval)
+    const maxAttempts = 300; // 5 minutes max (1 second interval)
     const pollInterval = Duration(seconds: 1);
     int attempts = 0;
 
