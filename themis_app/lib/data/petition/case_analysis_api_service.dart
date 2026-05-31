@@ -74,7 +74,7 @@ class CaseAnalysisApiService {
   ) async {
     final request = http.MultipartRequest(
       'POST',
-      _uri('/petition/analyze-case-test'),
+      _uri('/petition/analyze-case'),
     );
     request.headers['Authorization'] = 'Bearer $token';
     request.files.add(
