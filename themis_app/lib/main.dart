@@ -144,6 +144,11 @@ class AppController extends HookWidget {
           );
           selectedPrecedents.value = entry.precedents;
           selectedSummary.value = entry.summary;
+          selectedAnalysisData.value = {
+            if (entry.minuta != null) 'minuta': entry.minuta,
+            if (entry.petitionSummary != null) 'petition_summary': entry.petitionSummary,
+            if (entry.documents.isNotEmpty) 'documents': entry.documents,
+          };
           isInCaseHistory.value = false;
         },
       );
@@ -160,6 +165,7 @@ class AppController extends HookWidget {
           selectedCase.value = null;
           selectedPrecedents.value = null;
           selectedSummary.value = null;
+          selectedAnalysisData.value = null;
         },
       );
     }
@@ -194,6 +200,11 @@ class AppController extends HookWidget {
         );
         selectedPrecedents.value = entry.precedents;
         selectedSummary.value = entry.summary;
+        selectedAnalysisData.value = {
+          if (entry.minuta != null) 'minuta': entry.minuta,
+          if (entry.petitionSummary != null) 'petition_summary': entry.petitionSummary,
+          if (entry.documents.isNotEmpty) 'documents': entry.documents,
+        };
       },
       // Abre o histórico completo de processos (Frente 2)
       onViewAllHistory: profileMode.value == ProfileMode.judge

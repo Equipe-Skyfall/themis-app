@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../ui/app_bar.dart';
 import '../ui/footer_navbar.dart';
 import '../../hooks/use_history_controller.dart';
-import '../../lib/models.dart';
-import '../../lib/profile_mode.dart';
+import 'package:themis_app/lib/models.dart';
+import 'package:themis_app/lib/profile_mode.dart';
 import '../../services/sentence_draft_pdf_service.dart';
 
 class SentenceDraftPage extends HookWidget {
@@ -73,7 +74,7 @@ class SentenceDraftPage extends HookWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Minuta de Sentença',
+                            'Minuta de Decisão',
                             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: const Color(0xFF1E1E2C),
@@ -165,7 +166,9 @@ class SentenceDraftPage extends HookWidget {
                 const SizedBox(height: 20),
 
                 // Botão Exportar
-                if (selectedEntry.value != null)
+                if (selectedEntry.value != null &&
+                    selectedEntry.value!.minuta != null &&
+                    selectedEntry.value!.minuta!.isNotEmpty)
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
@@ -173,7 +176,7 @@ class SentenceDraftPage extends HookWidget {
                       gradient: LinearGradient(
                         colors: [
                           const Color(0xFF1E1E2C),
-                          const Color(0xFF1E1E2C).withOpacity(0.9),
+                          const Color(0xFF1E1E2C).withValues(alpha: 0.9),
                         ],
                       ),
                     ),
@@ -217,44 +220,110 @@ class SentenceDraftPage extends HookWidget {
 
                 // Conteúdo da Minuta
                 if (selectedEntry.value != null) ...[
-                  // ═══════════════════════════════════════════════════════
-                  // SEÇÃO 1: RELATÓRIO
-                  // ═══════════════════════════════════════════════════════
-                  _buildSection(
-                    title: 'RELATÓRIO',
-                    content:
-                        'Análise do caso: ${selectedEntry.value!.filename}\n\n'
-                        'Data da análise: ${_formatDate(selectedEntry.value!.timestamp)}\n\n'
-                        'Precedentes encontrados: ${selectedEntry.value!.precedents.length}\n\n'
-                        'Este relatório apresenta a síntese da análise realizada sobre o caso em questão, incluindo os fatos relevantes, histórico processual e contexto jurídico.',
-                  ),
-                  const SizedBox(height: 20),
+                  if (selectedEntry.value!.minuta != null &&
+                      selectedEntry.value!.minuta!.isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey[200]!),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.02),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1D2A7A).withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'MINUTA DE DECISÃO',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1D2A7A),
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          MarkdownBody(
+                            data: selectedEntry.value!.minuta!,
+                            styleSheet: MarkdownStyleSheet(
+                              p: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[800],
+                                height: 1.6,
+                              ),
+                              h1: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E1E2C),
+                              ),
+                              h2: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1D2A7A),
+                              ),
+                              h3: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E1E2C),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange[200]!),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.orange[700], size: 32),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Minuta não disponível para este caso',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange[800],
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Este caso foi analisado antes do suporte a minutas. '
+                            'Realize uma nova análise para gerar a minuta de decisão.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.orange[700],
+                              height: 1.5,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
 
-                  // ═══════════════════════════════════════════════════════
-                  // SEÇÃO 2: FUNDAMENTAÇÃO
-                  // ═══════════════════════════════════════════════════════
-                  _buildSection(
-                    title: 'FUNDAMENTAÇÃO',
-                    content: _generateFundamentacao(selectedEntry.value!),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // ═══════════════════════════════════════════════════════
-                  // SEÇÃO 3: ANÁLISE DE ADERÊNCIA/DISTINÇÃO
-                  // ═══════════════════════════════════════════════════════
-                  _buildSection(
-                    title: 'ANÁLISE DE ADERÊNCIA/DISTINÇÃO',
-                    content: _generateAderencia(selectedEntry.value!),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // ═══════════════════════════════════════════════════════
-                  // SEÇÃO 4: DISPOSITIVO (DESTAQUE VISUAL)
-                  // ═══════════════════════════════════════════════════════
-                  _buildDispositivoSection(selectedEntry.value!),
-                  const SizedBox(height: 20),
-
-                  // Assinatura (placeholder)
+                  // Assinatura
+                  const SizedBox(height: 32),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -288,7 +357,7 @@ class SentenceDraftPage extends HookWidget {
                     child: Padding(
                       padding: const EdgeInsets.all(32),
                       child: Text(
-                        'Selecione um caso para visualizar a minuta de sentença',
+                        'Selecione um caso para visualizar a minuta de decisão',
                         style: TextStyle(
                           fontSize: 16,
                           color: Colors.grey[600],
@@ -315,155 +384,4 @@ class SentenceDraftPage extends HookWidget {
       ),
     );
   }
-
-  String _formatDate(DateTime dt) {
-    final y = dt.year.toString();
-    final m = dt.month.toString().padLeft(2, '0');
-    final d = dt.day.toString().padLeft(2, '0');
-    return '$d/$m/$y';
-  }
-
-  String _generateFundamentacao(HistoryEntry entry) {
-    return '''A fundamentação baseia-se na análise detalhada de ${entry.precedents.length} precedentes relevantes encontrados pela inteligência artificial.
-
-Os precedentes identificados apresentam forte correlação com o caso em tela, fornecendo sólida base jurisprudencial para a decisão.
-
-A análise considera jurisprudência consolidada, doutrina dominante e os princípios constitucionais aplicáveis, reafirmando compromisso com a segurança jurídica e coerência do ordenamento legal.''';
-  }
-
-  String _generateAderencia(HistoryEntry entry) {
-    final aplicaveis = entry.precedents.where((p) => p.status == 'applicable').length;
-    final possiveis = entry.precedents.where((p) => p.status == 'preliminary' || p.status == 'possibly_applicable').length;
-    final nao = entry.precedents.length - aplicaveis - possiveis;
-
-    return '''Análise Comparativa de Precedentes:
-
-✓ Precedentes Aplicáveis: $aplicaveis
-- Casos com jurisprudência totalmente consonante com o caso em análise
-
-≈ Precedentes Possivelmente Aplicáveis: $possiveis  
-- Casos com elementos similares que complementam a análise
-
-✗ Precedentes Não Aplicáveis: $nao
-- Casos com distinções materiais relevantes
-
-A ponderação destes casos permite identificar o entendimento jurisprudencial predominante e fundamentar a decisão com segurança jurídica.''';
-  }
-
-  Widget _buildDispositivoSection(HistoryEntry entry) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E2C),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFF1E1E2C).withOpacity(0.3),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1E1E2C).withOpacity(0.15),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Text(
-              'DISPOSITIVO',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 1.2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '''Pelos fundamentos expostos e pela análise jurisprudencial realizada sobre o caso "${entry.filename}", DECIDO:
-
-I. Acolher as argumentações fundamentadas nos ${entry.precedents.length} precedentes analisados.
-
-II. Aplicar os entendimentos jurisprudenciais consolidados ao caso em tela.
-
-III. Determinar o prosseguimento conforme as normas legais pertinentes.
-
-IV. Condenar ao pagamento das custas processuais e honorários advocatícios.
-
-V. Esta sentença pode ser objeto de recurso ordinário no prazo legal.
-
-Dado e passado nesta data, pela análise assistida por inteligência artificial.''',
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.white,
-              height: 1.6,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSection({
-    required String title,
-    required String content,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey[700],
-                letterSpacing: 0.8,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            content,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[800],
-              height: 1.6,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
-

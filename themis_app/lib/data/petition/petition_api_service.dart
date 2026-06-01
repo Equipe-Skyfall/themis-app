@@ -233,7 +233,7 @@ class PetitionApiService {
     Function(String)? onStatusUpdate,
   ) async {
     const maxAttempts = 120; // 2 minutes max (1 second interval)
-    const pollInterval = Duration(seconds: 1);
+    const pollInterval = Duration(seconds: 5);
     int attempts = 0;
 
     while (attempts < maxAttempts) {

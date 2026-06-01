@@ -135,7 +135,7 @@ class CaseAnalysisApiService {
     Function(String)? onStatusUpdate,
   ) async {
     const maxAttempts = 300; // 5 minutes max (1 second interval)
-    const pollInterval = Duration(seconds: 1);
+    const pollInterval = Duration(seconds: 5);
     int attempts = 0;
 
     while (attempts < maxAttempts) {
@@ -230,8 +230,7 @@ class CaseAnalysisApiService {
   }
 
   /// Fetches the case analysis history for the Judge front.
-  /// Fetches the shared history used by both fronts.
-  /// Calls GET /petition/history.
+  /// Calls GET /petition/case-analysis-history.
   Future<List<Map<String, dynamic>>> fetchCaseAnalysisHistory({
     required String token,
   }) async {
@@ -239,7 +238,7 @@ class CaseAnalysisApiService {
 
     final response = await _httpClient
         .get(
-          _uri('/petition/history'),
+          _uri('/petition/case-analysis-history'),
           headers: {'Authorization': 'Bearer $token'},
         )
         .timeout(const Duration(seconds: 30));

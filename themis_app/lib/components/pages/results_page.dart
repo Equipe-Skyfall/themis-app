@@ -358,7 +358,7 @@ class _ResultsPageState extends State<ResultsPage> {
             final paragraphs = cleanText.split('\n');
             return [
               pw.Text(
-                'MINUTA DE SENTENCA',
+                'MINUTA DE DECISAO',
                 style: pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
@@ -380,7 +380,7 @@ class _ResultsPageState extends State<ResultsPage> {
       final defaultPath = downloadsDir?.path ?? (await getApplicationDocumentsDirectory()).path;
 
       final selectedPath = await FilePicker.platform.saveFile(
-        dialogTitle: 'Salvar Minuta de Sentenca',
+        dialogTitle: 'Salvar Minuta de Decisao',
         fileName: fileName,
         type: FileType.custom,
         allowedExtensions: ['pdf'],
@@ -779,7 +779,7 @@ class _ResultsPageState extends State<ResultsPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Minuta de Sentença',
+                                'Minuta de Decisão',
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
@@ -788,7 +788,7 @@ class _ResultsPageState extends State<ResultsPage> {
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'Visualizar sentença gerada pela IA',
+                                'Visualizar minuta de decisão gerada pela IA',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF74839A),
@@ -1043,7 +1043,7 @@ class _MinutaBottomSheetState extends State<_MinutaBottomSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Minuta de Sentença',
+                          'Minuta de Decisão',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,

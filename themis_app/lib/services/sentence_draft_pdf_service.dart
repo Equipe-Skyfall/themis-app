@@ -43,15 +43,10 @@ class SentenceDraftPdfService {
   static Future<Uint8List> _generatePdfBytes(HistoryEntry entry) async {
     final pdf = pw.Document();
 
-    // Calcular contagem de precedentes por status
-    final aplicaveis =
-        entry.precedents.where((p) => p.status == 'applicable').length;
-    final possiveis = entry.precedents
-        .where((p) =>
-            p.status == 'preliminary' || p.status == 'possibly_applicable')
-        .length;
-    final nao =
-        entry.precedents.length - aplicaveis - possiveis;
+    final minuta = entry.minuta ?? '';
+    final paragraphs = minuta.isNotEmpty
+        ? minuta.split('\n')
+        : ['Minuta não disponível para este caso.'];
 
     pdf.addPage(
       pw.MultiPage(
@@ -61,79 +56,74 @@ class SentenceDraftPdfService {
         footer: (context) => _buildFooter(context),
         build: (context) {
           return [
-            // RELATÓRIO
-            _buildSectionTitle('RELATÓRIO'),
-            pw.SizedBox(height: 10),
-            pw.Text(
-              'Análise do caso: ${entry.filename}\n\n'
-              'Data da análise: ${_formatDate(entry.timestamp)}\n\n'
-              'Precedentes encontrados: ${entry.precedents.length}\n\n'
-              'Este relatório apresenta a síntese da análise realizada sobre o caso em questão, '
-              'incluindo os fatos relevantes, histórico processual e contexto jurídico.',
-              style: pw.TextStyle(
-                fontSize: 11,
-                color: _textColor,
-                height: 1.5,
-              ),
-            ),
-            pw.SizedBox(height: 25),
+            // MINUTA DE DECISÃO (conteúdo real da IA)
+            ...paragraphs.map((line) {
+              if (line.trim().isEmpty) return pw.SizedBox(height: 8);
 
-            // FUNDAMENTAÇÃO
-            _buildSectionTitle('FUNDAMENTAÇÃO'),
-            pw.SizedBox(height: 10),
-            pw.Text(
-              'A fundamentação baseia-se na análise detalhada de ${entry.precedents.length} '
-              'precedentes relevantes encontrados pela inteligência artificial.\n\n'
-              'Os precedentes identificados apresentam forte correlação com o caso em tela, '
-              'fornecendo sólida base jurisprudencial para a decisão.\n\n'
-              'A análise considera jurisprudência consolidada, doutrina dominante e os '
-              'princípios constitucionais aplicáveis, reafirmando compromisso com a segurança '
-              'jurídica e coerência do ordenamento legal.',
-              style: pw.TextStyle(
-                fontSize: 11,
-                color: _textColor,
-                height: 1.5,
-              ),
-            ),
-            pw.SizedBox(height: 25),
+              if (line.startsWith('## ')) {
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 16, bottom: 6),
+                  child: pw.Text(
+                    line.substring(3).replaceAll('**', ''),
+                    style: pw.TextStyle(
+                      fontSize: 13,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _primaryColor,
+                    ),
+                  ),
+                );
+              }
 
-            // ANÁLISE DE ADERÊNCIA/DISTINÇÃO
-            _buildSectionTitle('ANÁLISE DE ADERÊNCIA/DISTINÇÃO'),
-            pw.SizedBox(height: 10),
-            pw.Text(
-              'Análise Comparativa de Precedentes:\n\n'
-              '✓ Precedentes Aplicáveis: $aplicaveis\n'
-              'Casos com jurisprudência totalmente consonante com o caso em análise\n\n'
-              '≈ Precedentes Possivelmente Aplicáveis: $possiveis\n'
-              'Casos com elementos similares que complementam a análise\n\n'
-              '✗ Precedentes Não Aplicáveis: $nao\n'
-              'Casos com distinções materiais relevantes\n\n'
-              'A ponderação destes casos permite identificar o entendimento jurisprudencial '
-              'predominante e fundamentar a decisão com segurança jurídica.',
-              style: pw.TextStyle(
-                fontSize: 11,
-                color: _textColor,
-                height: 1.5,
-              ),
-            ),
-            pw.SizedBox(height: 25),
+              if (line.startsWith('# ')) {
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 20, bottom: 8),
+                  child: pw.Text(
+                    line.substring(2).replaceAll('**', ''),
+                    style: pw.TextStyle(
+                      fontSize: 15,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _textColor,
+                    ),
+                  ),
+                );
+              }
 
-            // DISPOSITIVO
-            _buildDispositivoSection(entry),
-            pw.SizedBox(height: 30),
+              if (line.startsWith('### ')) {
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 10, bottom: 4),
+                  child: pw.Text(
+                    line.substring(4).replaceAll('**', ''),
+                    style: pw.TextStyle(
+                      fontSize: 12,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _textColor,
+                    ),
+                  ),
+                );
+              }
+
+              return pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 6),
+                child: pw.Text(
+                  line.replaceAll('**', '').replaceAll('*', ''),
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    color: _textColor,
+                    height: 1.5,
+                  ),
+                ),
+              );
+            }),
+            pw.SizedBox(height: 40),
 
             // ASSINATURA
             pw.Column(
               children: [
                 pw.SizedBox(height: 50),
-                pw.Text('_' * 50,
-                    style: const pw.TextStyle(fontSize: 11)),
+                pw.Text('_' * 50, style: const pw.TextStyle(fontSize: 11)),
                 pw.SizedBox(height: 5),
                 pw.Text('Juiz(a) de Direito',
-                    style: pw.TextStyle(
-                      fontSize: 10,
-                      color: _greyColor,
-                    )),
+                    style: pw.TextStyle(fontSize: 10, color: _greyColor)),
               ],
             ),
           ];
@@ -277,69 +267,6 @@ class SentenceDraftPdfService {
             style: pw.TextStyle(
               fontSize: 9,
               color: _greyColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static pw.Widget _buildSectionTitle(String title) {
-    return pw.Container(
-      decoration: pw.BoxDecoration(
-        border: pw.Border(
-          left: pw.BorderSide(color: _primaryColor, width: 4),
-        ),
-      ),
-      padding: const pw.EdgeInsets.only(left: 10),
-      child: pw.Text(
-        title,
-        style: pw.TextStyle(
-          fontSize: 14,
-          fontWeight: pw.FontWeight.bold,
-          color: _primaryColor,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  static pw.Widget _buildDispositivoSection(HistoryEntry entry) {
-    final aplicaveis =
-        entry.precedents.where((p) => p.status == 'applicable').length;
-
-    return pw.Container(
-      decoration: pw.BoxDecoration(
-        color: _primaryColor,
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-      ),
-      padding: const pw.EdgeInsets.all(15),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text(
-            'DISPOSITIVO',
-            style: pw.TextStyle(
-              fontSize: 12,
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.white,
-              letterSpacing: 1,
-            ),
-          ),
-          pw.SizedBox(height: 12),
-          pw.Text(
-            'Pelos fundamentos expostos sobre "${entry.filename}", DECIDO:\n\n'
-            'I. Acolher as argumentações fundamentadas nos ${entry.precedents.length} '
-            'precedentes analisados, dos quais $aplicaveis são plenamente aplicáveis ao caso.\n\n'
-            'II. Aplicar os entendimentos jurisprudenciais consolidados ao caso em tela.\n\n'
-            'III. Determinar o prosseguimento conforme as normas legais pertinentes.\n\n'
-            'IV. Condenar ao pagamento das custas processuais e honorários advocatícios.\n\n'
-            'V. Esta sentença pode ser objeto de recurso ordinário no prazo legal.\n\n'
-            'Dado e passado nesta data, pela análise assistida por inteligência artificial.',
-            style: pw.TextStyle(
-              fontSize: 11,
-              color: PdfColors.white,
-              height: 1.6,
             ),
           ),
         ],
