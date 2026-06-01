@@ -38,6 +38,11 @@ class UploadScreen extends HookWidget {
     Map<String, dynamic>? analysisData,
   )? onAnalysisReady;
 
+  /// Chamado quando o PDF é enviado ao servidor e o job_id é recebido.
+  /// O polling continua em background no AppController.
+  final void Function(String jobId, String fileName, int candidates)?
+      onAnalysisJobStarted;
+
   /// Chamado quando a petição é gerada (Frente 1 — Advogado).
   final void Function(
     String petitionText,
@@ -52,6 +57,7 @@ class UploadScreen extends HookWidget {
     required this.profileMode,
     this.onBack,
     this.onAnalysisReady,
+    this.onAnalysisJobStarted,
     this.onPetitionGenerated,
   });
 
@@ -143,45 +149,20 @@ class UploadScreen extends HookWidget {
         return;
       }
 
+      // Mostra loading breve enquanto o arquivo é enviado ao servidor
       isLoadingVisible.value = true;
 
       try {
-        final response = await judgeService.analyzeCaseWithPolling(
-          token: token ?? '',
-          fileName: file.name,
-          pdfBytes: bytes,
-          candidates: parsedLimit,
+        final jobId = await judgeService.submitCaseForAnalysis(
+          token ?? '',
+          file.name,
+          bytes,
         );
 
         isLoadingVisible.value = false;
 
-        final rawList = response['results'];
-        final rawResults = (rawList is List)
-            ? rawList
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList()
-            : <Map<String, dynamic>>[];
-
-        if (rawResults.isEmpty) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Nenhum precedente encontrado.')),
-            );
-          }
-          return;
-        }
-
-        final precedents = rawResults.map(toPrecedent).toList();
-        final summary = response['summary'] as String?;
-        final analysisData = response['analysis_data'] as Map<String, dynamic>?;
-
-        onAnalysisReady?.call(
-          'Processo - ${file.name}',
-          precedents.take(parsedLimit).toList(),
-          summary,
-          analysisData,
-        );
+        // Entrega o job_id ao AppController que faz o polling em background
+        onAnalysisJobStarted?.call(jobId, file.name, parsedLimit);
       } on CaseAnalysisApiException catch (e) {
         isLoadingVisible.value = false;
         if (context.mounted) {
@@ -193,7 +174,7 @@ class UploadScreen extends HookWidget {
         isLoadingVisible.value = false;
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erro ao analisar processo. Tente novamente.')),
+            const SnackBar(content: Text('Erro ao enviar processo. Tente novamente.')),
           );
         }
       }
@@ -786,7 +767,7 @@ class _LoadingScreen extends StatelessWidget {
     final progress = (currentStep + 1) / _loadingTexts.length;
 
     return PopScope(
-      canPop: false,
+      canPop: true,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(

@@ -54,15 +54,36 @@ class CaseAnalysisApiService {
       throw const CaseAnalysisApiException('Quantidade de precedentes inválida.');
     }
 
-    // Step 1: Envia o PDF para /petition/analyze-case e recebe job_id
     onStatusUpdate?.call('Enviando processo para análise...');
-    final jobId = await _analyzeCase(token, fileName, pdfBytes);
+    final jobId = await submitCaseForAnalysis(token, fileName, pdfBytes);
 
-    // Step 2: Poll até concluir
     onStatusUpdate?.call('Analisando processo... (etapa 1/3)');
     final result = await _pollCaseStatus(token, jobId, onStatusUpdate);
 
-    // Step 3: Formata
+    return _formatAnalysisResult(result, candidates);
+  }
+
+  /// Envia o PDF e retorna o job_id. Usado para análise em background.
+  Future<String> submitCaseForAnalysis(
+    String token,
+    String fileName,
+    Uint8List pdfBytes,
+  ) async {
+    _assertConfigured();
+    return _analyzeCase(token, fileName, pdfBytes);
+  }
+
+  /// Faz polling até concluir e retorna o resultado formatado. Usado para análise em background.
+  Future<Map<String, dynamic>> fetchAnalysisResult(
+    String token,
+    String jobId,
+    int candidates,
+  ) async {
+    _assertConfigured();
+    if (candidates <= 0) {
+      throw const CaseAnalysisApiException('Quantidade de precedentes inválida.');
+    }
+    final result = await _pollCaseStatus(token, jobId, null);
     return _formatAnalysisResult(result, candidates);
   }
 

@@ -22,6 +22,12 @@ class DashboardPage extends HookWidget {
   /// Abre o histórico completo de processos (Frente 2)
   final VoidCallback? onViewAllHistory;
 
+  /// Estado de análise em background (Frente 2 — Juiz)
+  final bool isAnalyzing;
+  final String? analysisFileName;
+  final String? analysisError;
+  final VoidCallback? onAnalysisErrorDismissed;
+
   const DashboardPage({
     super.key,
     required this.profileMode,
@@ -33,6 +39,10 @@ class DashboardPage extends HookWidget {
     this.onOpenSettings,
     this.onSelectHistory,
     this.onViewAllHistory,
+    this.isAnalyzing = false,
+    this.analysisFileName,
+    this.analysisError,
+    this.onAnalysisErrorDismissed,
   });
 
   @override
@@ -47,6 +57,27 @@ class DashboardPage extends HookWidget {
     );
 
     final config = _DashboardConfig.forMode(profileMode, userName);
+
+    // Mostra snackbar de erro quando a análise em background falha
+    useEffect(() {
+      if (analysisError != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(analysisError!),
+              backgroundColor: Colors.red[700],
+              action: SnackBarAction(
+                label: 'OK',
+                textColor: Colors.white,
+                onPressed: () => onAnalysisErrorDismissed?.call(),
+              ),
+            ),
+          );
+          onAnalysisErrorDismissed?.call();
+        });
+      }
+      return null;
+    }, [analysisError]);
 
     // ── Pagination Hooks ──
     final currentPage = useState(1);
@@ -71,30 +102,75 @@ class DashboardPage extends HookWidget {
         onJudge: () => onProfileModeChanged(ProfileMode.judge),
         onNewAnalysis: onNewAnalysis,
       ),
-      body: RefreshIndicator(
-        onRefresh: activeHistory.refresh,
-        color: const Color(0xFF1D2A7A),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 260),
-          transitionBuilder: (child, animation) => FadeTransition(
-            opacity: animation,
-            child: child,
+      body: Column(
+        children: [
+          // Banner de análise em background
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: isAnalyzing
+                ? Container(
+                    key: const ValueKey('analyzing'),
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    color: const Color(0xFF1D2A7A),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            analysisFileName != null
+                                ? 'Analisando "$analysisFileName"...'
+                                : 'Análise em andamento...',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox.shrink(key: ValueKey('idle')),
           ),
-          child: _DashboardBody(
-            key: ValueKey<ProfileMode>(profileMode),
-            config: config,
-            onLogout: onLogout,
-            activeHistory: activeHistory,
-            onSelectHistory: onSelectHistory,
-            isJudge: profileMode == ProfileMode.judge,
-            currentPage: page,
-            totalPages: totalPages,
-            onPageChanged: (newPage) {
-              currentPage.value = newPage;
-            },
-            onViewAllHistory: onViewAllHistory,
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: activeHistory.refresh,
+              color: const Color(0xFF1D2A7A),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 260),
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: child,
+                ),
+                child: _DashboardBody(
+                  key: ValueKey<ProfileMode>(profileMode),
+                  config: config,
+                  onLogout: onLogout,
+                  activeHistory: activeHistory,
+                  onSelectHistory: onSelectHistory,
+                  isJudge: profileMode == ProfileMode.judge,
+                  currentPage: page,
+                  totalPages: totalPages,
+                  onPageChanged: (newPage) {
+                    currentPage.value = newPage;
+                  },
+                  onViewAllHistory: onViewAllHistory,
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
