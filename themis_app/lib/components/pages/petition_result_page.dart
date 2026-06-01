@@ -121,7 +121,7 @@ class _PetitionResultPageState extends State<PetitionResultPage> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: CustomAppBar(
-        title: 'Petição Gerada',
+        title: 'Minuta Inicial',
         onBack: widget.onBack,
         showSettings: false,
       ),
@@ -132,7 +132,7 @@ class _PetitionResultPageState extends State<PetitionResultPage> {
           children: [
             // ── Cabeçalho ──
             const Text(
-              'Petição Gerada',
+              'Minuta Inicial',
               style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w700,
@@ -140,7 +140,7 @@ class _PetitionResultPageState extends State<PetitionResultPage> {
               ),
             ),
             Text(
-              'Gerada com IA a partir do seu caso',
+              'Minuta inicial gerada com IA a partir do seu caso',
               style: TextStyle(fontSize: 14, color: Colors.grey[500]),
             ),
             const SizedBox(height: 18),
@@ -149,7 +149,7 @@ class _PetitionResultPageState extends State<PetitionResultPage> {
             if (_weakPrecedents || (_hasOnlyWeakPrecedents() && _selectedApplicability.isEmpty))
               _buildWeakPrecedentsAlert(),
 
-            // ── Card: Petição Gerada (abre bottom sheet) ──
+            // ── Card: Minuta Inicial (abre bottom sheet) ──
             Container(
               width: double.infinity,
               margin: const EdgeInsets.only(bottom: 20),
@@ -191,7 +191,7 @@ class _PetitionResultPageState extends State<PetitionResultPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Petição Gerada',
+                              'Minuta Inicial',
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -931,7 +931,7 @@ class _PetitionSheetState extends State<_PetitionSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Petição Gerada',
+                      'Minuta Inicial',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -1385,7 +1385,7 @@ class _ExportSelectionSheetState extends State<_ExportSelectionSheet> {
                           onChanged: (v) => setState(() => _includePetition = v),
                           activeTrackColor: _primary,
                           title: const Text(
-                            'Incluir Petição Gerada',
+                            'Incluir Minuta Inicial',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,

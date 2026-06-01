@@ -1,6 +1,7 @@
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 import '../data/petition/petition_api_service.dart';
+import '../data/petition/case_analysis_api_service.dart';
 import '../lib/models.dart';
 import '../lib/profile_mode.dart';
 import 'use_upload_petition_controller.dart' show toPrecedent;
@@ -24,9 +25,8 @@ HistoryController useHistoryController({
   required ProfileMode profileMode,
   PetitionApiService? service,
 }) {
-  final petitionService = useMemoized(() => service ?? PetitionApiService(), [
-    service,
-  ]);
+  final petitionService = useMemoized(() => service ?? PetitionApiService(), [service]);
+  final caseService = useMemoized(() => CaseAnalysisApiService(), []);
 
   final entries = useState<List<HistoryEntry>>([]);
   final isLoading = useState(false);
@@ -83,11 +83,12 @@ HistoryController useHistoryController({
           );
         }).toList();
       } else {
-        // Frente 2: GET /petition/history
-        final rawEntries = await petitionService.fetchHistory(token: token);
+        // Frente 2: GET /petition/case-analysis-history
+        final rawEntries = await caseService.fetchCaseAnalysisHistory(token: token);
 
         entries.value = rawEntries.map((raw) {
-          final rawResults = raw['results'];
+          // Campo correto é "precedent_results", não "results"
+          final rawResults = raw['precedent_results'];
           final precedents = <Precedent>[];
           if (rawResults is List) {
             for (final item in rawResults) {
@@ -104,16 +105,34 @@ HistoryController useHistoryController({
             timestamp = DateTime.now();
           }
 
+          // minuta vem direto no root, não em analysis_data
+          final minuta = raw['minuta'] is String ? raw['minuta'] as String : null;
+
+          // documents
+          final rawDocs = raw['documents'];
+          final documents = <Map<String, dynamic>>[];
+          if (rawDocs is List) {
+            for (final d in rawDocs) {
+              if (d is Map) documents.add(Map<String, dynamic>.from(d));
+            }
+          }
+
           return HistoryEntry(
             id: (raw['id'] ?? '').toString(),
             filename: (raw['filename'] ?? 'Sem nome').toString(),
             timestamp: timestamp,
-            summary: raw['summary'] is String ? raw['summary'] : null,
+            // campo correto é "case_summary", não "summary"
+            summary: raw['case_summary'] is String ? raw['case_summary'] as String : null,
             precedents: precedents,
+            minuta: minuta,
+            petitionSummary: raw['petition_summary'] is String ? raw['petition_summary'] as String : null,
+            documents: documents,
           );
         }).toList();
       }
     } on PetitionApiException catch (e) {
+      errorMessage.value = e.message;
+    } on CaseAnalysisApiException catch (e) {
       errorMessage.value = e.message;
     } catch (_) {
       errorMessage.value = 'Nao foi possivel carregar o historico.';

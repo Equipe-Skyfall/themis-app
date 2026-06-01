@@ -53,6 +53,9 @@ class HistoryEntry {
   final String? petitionText;
   final String? caseDescription;
   final bool weakPrecedents;
+  final String? minuta;
+  final String? petitionSummary;
+  final List<Map<String, dynamic>> documents;
 
   HistoryEntry({
     required this.id,
@@ -63,5 +66,8 @@ class HistoryEntry {
     this.petitionText,
     this.caseDescription,
     this.weakPrecedents = false,
+    this.minuta,
+    this.petitionSummary,
+    this.documents = const [],
   });
 }
