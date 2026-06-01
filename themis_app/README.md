@@ -19,6 +19,10 @@ cd themis_app
 ```
 
 ```
+flutter pub get
+```
+
+```
 flutter run -d windows
 ```
 
@@ -29,6 +33,10 @@ flutter run -d windows
 ```env
 AUTH_API_BASE_URL=https://auth.skytrack.space
 THEMIS_API_BASE_URL=https://themis-back.onrender.com
+
+ou 
+
+THEMIS_API_BASE_URL=https://api.skytrack.space
 ```
 
 2. Se quiser recriar o arquivo localmente, use `.env.example` como base.

@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import '../ui/app_bar.dart';
 import '../ui/precedent_sheet.dart';
 import '../../lib/models.dart';
+import '../../services/pdf_export_service.dart';
 
 class ResultsPage extends StatefulWidget {
   final CaseHistory case_;
   final List<Precedent> precedents;
   final String? summary;
+  final Map<String, dynamic>? analysisData;
   final VoidCallback onBack;
 
   const ResultsPage({
@@ -14,6 +22,7 @@ class ResultsPage extends StatefulWidget {
     required this.case_,
     required this.precedents,
     this.summary,
+    this.analysisData,
     required this.onBack,
   });
 
@@ -23,6 +32,7 @@ class ResultsPage extends StatefulWidget {
 
 class _ResultsPageState extends State<ResultsPage> {
   final Set<String> _selectedApplicability = <String>{};
+  bool _isExporting = false;
 
   static const List<_ApplicabilityFilterOption> _applicabilityOptions = [
     _ApplicabilityFilterOption(
@@ -75,6 +85,544 @@ class _ResultsPageState extends State<ResultsPage> {
     setState(() {
       _selectedApplicability.clear();
     });
+  }
+
+  bool _hasOnlyWeakPrecedents() {
+    if (widget.precedents.isEmpty) {
+      return false;
+    }
+    return !widget.precedents.any((p) => 
+      _normalizeStatus(p.status) == 'applicable'
+    );
+  }
+
+  Widget _buildWeakPrecedentsAlert() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFE082)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              color: Color(0xFFF9A825),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Atenção: Sem precedentes fortes',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFE65100),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Nenhum precedente com alta relevância foi encontrado. '
+                  'Os resultados abaixo podem ter baixa similaridade. '
+                  'Recomendamos revisar com cautela.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[700],
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportToPdf() async {
+    setState(() {
+      _isExporting = true;
+    });
+
+    try {
+      final filePath = await PDFExportService.exportPrecedentsToPdf(
+        _visiblePrecedents,
+        widget.case_,
+        widget.summary,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF salvo em: $filePath'),
+            backgroundColor: const Color(0xFF4CAF50),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao exportar PDF: $e'),
+            backgroundColor: const Color(0xFFD94841),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isExporting = false;
+        });
+      }
+    }
+  }
+
+  void _showMinutaBottomSheet(BuildContext context) {
+    final minuta = widget.analysisData?['minuta'] ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _MinutaBottomSheet(
+        initialMinuta: minuta,
+        onExport: _exportMinutaToPdf,
+      ),
+    );
+  }
+
+  /// Sanitize text to only contain characters supported by the default PDF font (Latin-1).
+  String _sanitizeForPdf(String input) {
+    var text = input;
+
+    // Replace common Unicode dashes with ASCII hyphen
+    text = text.replaceAll('\u2014', '-');  // em dash —
+    text = text.replaceAll('\u2013', '-');  // en dash –
+    text = text.replaceAll('\u2212', '-');  // minus sign −
+    text = text.replaceAll('\u2010', '-');  // hyphen ‐
+    text = text.replaceAll('\u2011', '-');  // non-breaking hyphen ‑
+
+    // Replace smart/curly quotes with straight quotes
+    text = text.replaceAll('\u201C', '"');  // left double "
+    text = text.replaceAll('\u201D', '"');  // right double "
+    text = text.replaceAll('\u201E', '"');  // double low „
+    text = text.replaceAll('\u2018', "'"); // left single '
+    text = text.replaceAll('\u2019', "'"); // right single '
+    text = text.replaceAll('\u201A', "'"); // single low ‚
+
+    // Replace bullets and special list markers
+    text = text.replaceAll('\u2022', '-');  // bullet •
+    text = text.replaceAll('\u2023', '-');  // triangular bullet ‣
+    text = text.replaceAll('\u25E6', '-');  // white bullet ◦
+    text = text.replaceAll('\u2043', '-');  // hyphen bullet ⁃
+
+    // Replace ellipsis
+    text = text.replaceAll('\u2026', '...');  // …
+
+    // Replace spaces
+    text = text.replaceAll('\u00A0', ' ');  // non-breaking space
+    text = text.replaceAll('\u2003', ' ');  // em space
+    text = text.replaceAll('\u2002', ' ');  // en space
+    text = text.replaceAll('\u2009', ' ');  // thin space
+    text = text.replaceAll('\u200B', '');   // zero-width space
+    text = text.replaceAll('\uFEFF', '');   // BOM
+
+    // Replace other common symbols
+    text = text.replaceAll('\u00B0', 'o');  // degree symbol ° -> o (for nº usage)
+    text = text.replaceAll('\u2192', '->'); // right arrow →
+    text = text.replaceAll('\u2190', '<-'); // left arrow ←
+
+    // Removed markdown stripping here so we can parse it in _buildMarkdownParagraph
+
+    // Remove any remaining non-Latin-1 characters (codepoint > 255)
+    // but preserve accented Portuguese characters which ARE in Latin-1
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      final code = text.codeUnitAt(i);
+      if (code <= 255) {
+        buffer.writeCharCode(code);
+      } else {
+        buffer.write(' '); // replace unknown chars with space
+      }
+    }
+    text = buffer.toString();
+
+    return text;
+  }
+
+  pw.Widget _buildMarkdownParagraph(String text) {
+    if (text.startsWith('# ')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 12, top: 8),
+        child: pw.Text(
+          text.substring(2).replaceAll('**', '').replaceAll('*', ''),
+          style: pw.TextStyle(
+            fontSize: 16,
+            fontWeight: pw.FontWeight.bold,
+            color: const PdfColor.fromInt(0xFF1E1E2C),
+          ),
+        ),
+      );
+    } else if (text.startsWith('## ')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 10, top: 6),
+        child: pw.Text(
+          text.substring(3).replaceAll('**', '').replaceAll('*', ''),
+          style: pw.TextStyle(
+            fontSize: 14,
+            fontWeight: pw.FontWeight.bold,
+            color: const PdfColor.fromInt(0xFF1D2A7A), // Azul Themis
+          ),
+        ),
+      );
+    } else if (text.startsWith('### ')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 8, top: 4),
+        child: pw.Text(
+          text.substring(4).replaceAll('**', '').replaceAll('*', ''),
+          style: pw.TextStyle(
+            fontSize: 12,
+            fontWeight: pw.FontWeight.bold,
+            color: const PdfColor.fromInt(0xFF1E1E2C),
+          ),
+        ),
+      );
+    } else if (text.startsWith('---')) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 8),
+        child: pw.Divider(color: const PdfColor.fromInt(0xFFE0E0E0)),
+      );
+    }
+
+    final spans = <pw.InlineSpan>[];
+    final parts = text.split('**');
+    
+    for (int i = 0; i < parts.length; i++) {
+      if (parts[i].isEmpty) continue;
+      
+      // Clean up remaining single asterisks
+      final textPart = parts[i].replaceAll('*', '');
+      if (textPart.isEmpty) continue;
+      
+      if (i % 2 == 1) {
+        // Bold
+        spans.add(pw.TextSpan(
+          text: textPart,
+          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+        ));
+      } else {
+        // Normal
+        spans.add(pw.TextSpan(text: textPart));
+      }
+    }
+
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      child: pw.RichText(
+        textAlign: pw.TextAlign.justify,
+        text: pw.TextSpan(
+          style: const pw.TextStyle(
+            fontSize: 10,
+            height: 1.5,
+          ),
+          children: spans,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportMinutaToPdf(String minuta) async {
+    try {
+      setState(() => _isExporting = true);
+
+      final cleanText = _sanitizeForPdf(minuta);
+
+      final pdf = pw.Document();
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(30),
+          build: (context) {
+            final paragraphs = cleanText.split('\n');
+            return [
+              pw.Text(
+                'MINUTA DE DECISAO',
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              ...paragraphs.map((p) {
+                if (p.trim().isEmpty) return pw.SizedBox(height: 10);
+                return _buildMarkdownParagraph(p);
+              }),
+            ];
+          },
+        ),
+      );
+
+      final pdfBytes = await pdf.save();
+      final fileName = 'Themis_Minuta_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final downloadsDir = await getDownloadsDirectory();
+      final defaultPath = downloadsDir?.path ?? (await getApplicationDocumentsDirectory()).path;
+
+      final selectedPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Salvar Minuta de Decisao',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        initialDirectory: defaultPath,
+      );
+
+      if (selectedPath == null) {
+        return;
+      }
+
+      final file = File(selectedPath);
+      await file.writeAsBytes(pdfBytes);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF salvo: ${selectedPath.split('\\').last}'),
+            backgroundColor: const Color(0xFF4CAF50),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro: $e'),
+            backgroundColor: const Color(0xFFD94841),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    }
+  }
+
+  static const Map<String, String> _docTypeLabels = {
+    'peticao_inicial': 'Petição Inicial',
+    'contestacao': 'Contestação',
+    'replica': 'Réplica',
+    'sentenca': 'Sentença',
+    'apelacao': 'Apelação',
+    'contrarrazoes': 'Contrarrazões',
+  };
+
+  static const Map<String, Color> _docTypeColors = {
+    'peticao_inicial': Color(0xFF1D2A7A),
+    'contestacao': Color(0xFFD94841),
+    'replica': Color(0xFFF9A825),
+    'sentenca': Color(0xFF4CAF50),
+    'apelacao': Color(0xFF7B1FA2),
+    'contrarrazoes': Color(0xFF607D8B),
+  };
+
+  Widget _buildDocumentsSection(Map<String, dynamic> analysisData) {
+    final rawDocs = analysisData['documents'];
+    if (rawDocs is! List || rawDocs.isEmpty) return const SizedBox.shrink();
+
+    final docs = rawDocs.whereType<Map>().toList();
+    if (docs.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'PEÇAS PROCESSUAIS IDENTIFICADAS',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1D2A7A),
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...docs.asMap().entries.map((entry) {
+              final i = entry.key;
+              final doc = Map<String, dynamic>.from(entry.value);
+              final type = (doc['type'] ?? '').toString();
+              final title = (doc['title'] ?? '').toString();
+              final startPage = doc['start_page'];
+              final endPage = doc['end_page'];
+              final summary = (doc['summary'] ?? '').toString();
+              final label = _docTypeLabels[type] ?? type;
+              final color = _docTypeColors[type] ?? const Color(0xFF607D8B);
+
+              return Column(
+                children: [
+                  if (i > 0)
+                    Divider(height: 20, color: Colors.grey[100]),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (startPage != null && endPage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            'Págs. $startPage–$endPage',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[500],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (title.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1E1E2C),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  if (summary.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      summary,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        height: 1.4,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPetitionSummaryCard(String petitionSummary) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 5,
+              decoration: const BoxDecoration(
+                color: Color(0xFF4CAF50),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'RESUMO DA PETIÇÃO INICIAL',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF2E7D32),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      petitionSummary,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF3A3A4A),
+                        height: 1.55,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -170,6 +718,91 @@ class _ResultsPageState extends State<ResultsPage> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+
+            // ── PEÇAS PROCESSUAIS ──
+            if (widget.analysisData != null)
+              _buildDocumentsSection(widget.analysisData!),
+
+            // ── RESUMO DA PETIÇÃO INICIAL ──
+            if (widget.analysisData != null &&
+                widget.analysisData!['petition_summary'] is String &&
+                (widget.analysisData!['petition_summary'] as String).trim().isNotEmpty)
+              _buildPetitionSummaryCard(
+                widget.analysisData!['petition_summary'] as String,
+              ),
+
+            // ── MINUTA DE SENTENÇA ──
+            if (widget.analysisData != null &&
+                widget.analysisData!['minuta'] is String &&
+                (widget.analysisData!['minuta'] as String).trim().isNotEmpty)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: InkWell(
+                  onTap: () => _showMinutaBottomSheet(context),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1D2A7A).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.description_rounded,
+                            color: Color(0xFF1D2A7A),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Minuta de Decisão',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E1E2C),
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Visualizar minuta de decisão gerada pela IA',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF74839A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right,
+                          color: Color(0xFF74839A),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -271,9 +904,55 @@ class _ResultsPageState extends State<ResultsPage> {
                       );
                     }).toList(),
                   ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton(
+                      onPressed: _isExporting ? null : _exportToPdf,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1D2A7A),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFF1D2A7A).withOpacity(0.6),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: _isExporting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.download_rounded, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Exportar para PDF',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
                 ],
               ),
             ),
+
+            // ── ALERTA DE PRECEDENTES FRACOS ──
+            if (_hasOnlyWeakPrecedents() && _selectedApplicability.isEmpty)
+              _buildWeakPrecedentsAlert(),
 
             ...visiblePrecedents.map((precedent) {
               return _PrecedentCard(
@@ -304,6 +983,207 @@ class _ResultsPageState extends State<ResultsPage> {
     );
   }
 }
+
+// ─── Minuta Bottom Sheet com edição ──────────────────────────────────────────
+
+class _MinutaBottomSheet extends StatefulWidget {
+  final String initialMinuta;
+  final Future<void> Function(String) onExport;
+
+  const _MinutaBottomSheet({
+    required this.initialMinuta,
+    required this.onExport,
+  });
+
+  @override
+  State<_MinutaBottomSheet> createState() => _MinutaBottomSheetState();
+}
+
+class _MinutaBottomSheetState extends State<_MinutaBottomSheet> {
+  bool _isEditing = false;
+  late TextEditingController _textController;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController(text: widget.initialMinuta);
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  String get _currentText => _textController.text;
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            // ── Cabeçalho ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Minuta de Decisão',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1E2C),
+                          ),
+                        ),
+                        if (_isEditing)
+                          const Text(
+                            'Modo edição — altere o texto antes de exportar',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFFF9A825),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      setState(() => _isEditing = !_isEditing);
+                    },
+                    icon: Icon(
+                      _isEditing ? Icons.visibility_rounded : Icons.edit_rounded,
+                      color: _isEditing
+                          ? const Color(0xFF1D2A7A)
+                          : Colors.grey[600],
+                    ),
+                    tooltip: _isEditing ? 'Visualizar' : 'Editar',
+                  ),
+                  IconButton(
+                    onPressed: () => widget.onExport(_currentText),
+                    icon: const Icon(Icons.download_rounded),
+                    tooltip: 'Download PDF',
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // ── Conteúdo ──
+            Expanded(
+              child: _isEditing
+                  ? Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextField(
+                        controller: _textController,
+                        maxLines: null,
+                        expands: true,
+                        textAlignVertical: TextAlignVertical.top,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF1E1E2C),
+                          height: 1.6,
+                          fontFamily: 'monospace',
+                        ),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                          contentPadding: const EdgeInsets.all(14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF1D2A7A),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(20),
+                      child: MarkdownBody(
+                        data: _currentText,
+                        styleSheet: MarkdownStyleSheet(
+                          h1: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1E2C),
+                          ),
+                          h2: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1D2A7A),
+                          ),
+                          h3: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF1E1E2C),
+                          ),
+                          p: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF3A3A4A),
+                            height: 1.6,
+                          ),
+                          strong: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E1E2C),
+                          ),
+                          em: const TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFF3A3A4A),
+                          ),
+                          code: TextStyle(
+                            backgroundColor: Colors.grey[100],
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            color: Colors.grey[800],
+                          ),
+                          blockquote: TextStyle(
+                            color: Colors.grey[600],
+                            fontStyle: FontStyle.italic,
+                          ),
+                          listBullet: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF3A3A4A),
+                            height: 1.6,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ApplicabilityFilterOption {
   final String status;

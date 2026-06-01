@@ -43,3 +43,31 @@ class Precedent {
     required this.whyApplies,
   });
 }
+
+class HistoryEntry {
+  final String id;
+  final String filename;
+  final DateTime timestamp;
+  final String? summary;
+  final List<Precedent> precedents;
+  final String? petitionText;
+  final String? caseDescription;
+  final bool weakPrecedents;
+  final String? minuta;
+  final String? petitionSummary;
+  final List<Map<String, dynamic>> documents;
+
+  HistoryEntry({
+    required this.id,
+    required this.filename,
+    required this.timestamp,
+    this.summary,
+    required this.precedents,
+    this.petitionText,
+    this.caseDescription,
+    this.weakPrecedents = false,
+    this.minuta,
+    this.petitionSummary,
+    this.documents = const [],
+  });
+}

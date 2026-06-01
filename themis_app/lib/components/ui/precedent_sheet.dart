@@ -63,7 +63,6 @@ class _PrecedentSheetUI extends StatelessWidget {
       '\n',
     );
 
-
     text = text.replaceAll(RegExp(r'<[^>]*>'), '');
 
     text = text
@@ -85,9 +84,21 @@ class _PrecedentSheetUI extends StatelessWidget {
     return text.trim();
   }
 
+  String _capitalizeFirst(String s) {
+    if (s.isEmpty) return s;
+    var i = 0;
+    while (i < s.length && s[i].trim().isEmpty) {
+      i++;
+    }
+    if (i >= s.length) return s;
+    return s.substring(0, i) + s[i].toUpperCase() + s.substring(i + 1);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final explanationText = _displayValue(precedent.whyApplies);
+    final explanationText = _capitalizeFirst(
+      _displayValue(precedent.whyApplies),
+    );
     final enunciadoText = _displayValue(precedent.summary);
     final shouldShowEnunciado =
         enunciadoText.toLowerCase().trim() !=
@@ -95,7 +106,7 @@ class _PrecedentSheetUI extends StatelessWidget {
 
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFF5F6F7),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(
@@ -142,7 +153,7 @@ class _PrecedentSheetUI extends StatelessWidget {
                   background: _getStatusBackground(precedent.status),
                 ),
                 _buildBadge(
-                    label: precedent.situacao,
+                  label: precedent.situacao,
                   textColor: const Color(0xFF1E5EFF),
                   background: const Color(0xFF1E5EFF).withOpacity(0.12),
                 ),
@@ -181,6 +192,13 @@ class _PrecedentSheetUI extends StatelessWidget {
             ),
             const SizedBox(height: 18),
 
+            _buildOffsetField(
+              context,
+              'Explicação',
+              explanationText,
+              labelColor: const Color(0xFF1E5EFF),
+            ),
+
             _buildField(
               'Tema do Precedente',
               _displayValue(precedent.theme),
@@ -190,11 +208,6 @@ class _PrecedentSheetUI extends StatelessWidget {
             _buildField(
               'Situação',
               precedent.situacao,
-              labelColor: const Color(0xFF1E5EFF),
-            ),
-            _buildField(
-              'Explicação',
-              explanationText,
               labelColor: const Color(0xFF1E5EFF),
             ),
             if (shouldShowEnunciado) _buildField('Enunciado', enunciadoText),
@@ -250,6 +263,56 @@ class _PrecedentSheetUI extends StatelessWidget {
               color: Colors.grey[900],
               fontSize: 14,
               height: 1.32,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOffsetField(
+    BuildContext context,
+    String label,
+    String value, {
+    Color? labelColor,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: labelColor ?? Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: theme.dividerColor.withOpacity(0.16)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              value,
+              style: TextStyle(
+                color: theme.colorScheme.onSurface,
+                fontSize: 14,
+                height: 1.32,
+              ),
             ),
           ),
         ],
